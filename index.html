@@ -329,7 +329,7 @@ function stats(p){const r=RACES[p.race],b=base(p.lvl),al=p.alloc||{atk:0,def:0,h
  let atk=b.atk+(p.train.atk+al.atk)*TRAIN.atk.per,def=b.def+(p.train.def+al.def)*TRAIN.def.per,hp=b.hp+(p.train.hp+al.hp)*TRAIN.hp.per,spd=b.spd+(p.train.spd+al.spd)*TRAIN.spd.per;
  for(const s in p.equip){const it=p.equip[s];if(it){const m=1+.1*(it.up||0);atk+=it.atk*m;def+=it.def*m;hp+=it.hp*m;
   if(it.sockets)for(const rn of it.sockets)if(rn){if(rn.k==='atk')atk+=rn.val;else if(rn.k==='def')def+=rn.val;else if(rn.k==='hp')hp+=rn.val;else if(rn.k==='spd')spd+=rn.val}}}
- const buff=p.buffUntil>Date.now()?1.25:1,cb=p.craftBuffUntil>Date.now()?1.1:1,pm=(1+.05*(p.prestige||0))*(1+.15*(p.ascend||0)),th=1+.02*((p.town&&p.town.uzeiga)||0),sb=1+setBonus(p).mul;
+ const buff=p.buffUntil>Date.now()?1.15:1,cb=p.craftBuffUntil>Date.now()?1.1:1,pm=(1+.05*(p.prestige||0))*(1+.15*(p.ascend||0)),th=1+.02*((p.town&&p.town.uzeiga)||0),sb=1+setBonus(p).mul;
  const tal=p.talent&&TALENTS[p.race]?TALENTS[p.race].find(t=>t.id===p.talent):null,ta=tal&&tal.atk||1,td=tal&&tal.def||1,thh=tal&&tal.hp||1,tsp=tal&&tal.spd||1;
  const compActive=p.comp&&p.comp.active?COMPANIONS.find(c=>c.id===p.comp.active):null,compLvl=compActive?((p.comp.lvl&&p.comp.lvl[compActive.id])||1):0;
  return{hp:Math.round(hp*r.hp*(1+companionBuf(p,'hp'))*pm*th*sb*thh),atk:atk*r.atk*buff*cb*(1+companionBuf(p,'atk'))*pm*sb*ta,def:def*r.def*buff*cb*(1+companionBuf(p,'def'))*pm*sb*td,spd:spd*(1+companionBuf(p,'spd'))*pm*sb*tsp,crit:clamp(.05+spd*.002+r.crit,0,.6),
@@ -390,12 +390,16 @@ const resCap=p=>200+40*((p.town&&p.town.sandelis)||0);
 const IDLE_CAP_H=4;
 
 const Server={
- options(p,zi){const z=ZONES[zi];return OPTS.map((o,i)=>{const L=Math.max(1,z.lvl+o.off),b=base(L),bm=o.boss?1.5:1,bs=o.boss?1.1:1,name=o.boss?z.boss:z.en[i%z.en.length];
+ options(p,zi){const z=ZONES[zi];return OPTS.map((o,i)=>{const L=Math.max(1,z.lvl+o.off),b=base(L),bm=o.boss?1.9:1,bs=o.boss?1.35:1,name=o.boss?z.boss:z.en[i%z.en.length];
   return{i,k:o.k,boss:!!o.boss,name,L,hp:Math.round(b.hp*ENEMY_SCALE*bm),atk:b.atk*ENEMY_SCALE*bs,def:b.def*ENEMY_SCALE*bs,spd:b.spd,crit:.05+b.spd*.002,elem:elemOf(name)}})},
  ready(p,now){if(now-p.lastBattle<cooldownMs())return'Palauk, kovotojas dar ilsisi.';if(p.hp<=1)return'Per sužeistas. Pailsėk, gerk eliksyrą arba pagydyk.';return null},
  after(p,P,sim,now){p.lastBattle=now;p.actions++;p.hp=sim.win?sim.php:Math.max(1,Math.round(P.hp*.1));p.hpT=now},
  addItem(p,it,res){it.id=p.idc++;if(it.r===3)p.legends++;if(p.inv.length>=invCap(p)){const z=RAR[it.r].sell;p.zen+=z;res.sold=z}else{p.inv.push(it);res.item=it}},
- addCrystal(p,res,now){p.crystals++;res.crystal=true;if(p.crystals>=7){p.crystals=0;p.sets++;p.buffUntil=now+30*60000;res.crystal='full'}},
+ addCrystal(p,res,now){p.crystals++;res.crystal=true;if(p.crystals>=7){p.crystals=0;p.sets++;
+  const roll=Math.random();
+  if(roll<.4){const zen=Math.round(100+p.lvl*15);p.zen+=zen;res.crystal={kind:'zen',zen}}
+  else if(roll<.75){p.buffUntil=now+20*60000;res.crystal={kind:'power'}}
+  else{const it=genItem(p.lvl,true,.6,3);Server.addItem(p,it,res);res.crystal={kind:'item',item:it}}}},
  addCompanion(p,res){const owned=p.comp.owned,avail=COMPANIONS.filter(c=>!owned.includes(c.id));
   if(avail.length){const c=pick(avail);owned.push(c.id);if(!p.comp.active)p.comp.active=c.id;res.comp={id:c.id,n:c.n,ico:c.ico,dup:false}}
   else{const c=pick(COMPANIONS),z=50;p.zen+=z;res.comp={id:c.id,n:c.n,ico:c.ico,dup:true,zen:z}}},
@@ -506,9 +510,9 @@ const Server={
   if(defeated>(p.marathon.best||0))p.marathon.best=defeated;
   return res},
  train(p,stat,tier){if(p.training)return{err:'Jau treniruojiesi.'};const t=TIERS[tier],secs=Math.round(t.s*RACES[p.race].train*trainM(p)),pts=Math.round(t.m*(1+Math.floor(p.lvl/4)));
-  p.training={stat,start:Date.now(),end:Date.now()+secs*1000,pts};return{ok:1}},
+  p.training={stat,start:Date.now(),end:Date.now()+secs*1000,pts,tier};return{ok:1}},
  claimTraining(p){const t=p.training;if(!t||Date.now()<t.end)return null;ensureToday(p);p.train[t.stat]+=t.pts;p.training=null;p.today.train++;return t},
- rush(p){const t=p.training;if(!t)return{err:'Nėra treniruotės.'};const cost=Math.ceil((t.end-Date.now())/1000*1.5);if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;t.end=Date.now();return{ok:1}},
+ rush(p){const t=p.training;if(!t)return{err:'Nėra treniruotės.'};const tierMul=1.5+((t.tier||0)*.9),cost=Math.ceil((t.end-Date.now())/1000*tierMul);if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;t.end=Date.now();return{ok:1}},
  heal(p){regen(p);ensureToday(p);const mx=stats(p).hp,miss=mx-p.hp,cost=Math.ceil(miss*.4);if(miss<1)return{err:'Gyvybės pilnos.'};if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;p.hp=mx;p.today.spend+=cost;return{ok:1,cost}},
  potion(p){regen(p);if(p.potions<1)return{err:'Neturi eliksyrų. Nusipirk kuprinėje.'};const mx=stats(p).hp;if(p.hp>=mx)return{err:'Gyvybės pilnos.'};p.potions--;p.hp=Math.min(mx,p.hp+mx*.5);return{ok:1}},
  buy(p,k){const s=SHOP[k],c=s.c(p.lvl),now=Date.now();if(c>p.zen)return{err:'Neužtenka monetų ('+fmt(c)+').'};p.zen-=c;ensureToday(p);p.today.spend+=c;
@@ -752,7 +756,7 @@ const banner=()=>CFG.announce?`<div class="banner">📢 ${esc(CFG.announce)}</di
 function topZone(){for(let i=ZONES.length-1;i>=0;i--)if(S.lvl>=ZONES[i].lvl)return i;return 0}
 
 function header(){const st=stats(S),now=Date.now(),b=[],cp=S.comp.active?COMPANIONS.find(c=>c.id===S.comp.active):null;
- if(S.buffUntil>now)b.push('✨ +25% galia · '+mins(S.buffUntil));if(S.xpUntil>now)b.push('📜 +50% XP · '+mins(S.xpUntil));if(S.luckUntil>now)b.push('🍀 +50% grobis · '+mins(S.luckUntil));
+ if(S.buffUntil>now)b.push('✨ +15% galia · '+mins(S.buffUntil));if(S.xpUntil>now)b.push('📜 +50% XP · '+mins(S.xpUntil));if(S.luckUntil>now)b.push('🍀 +50% grobis · '+mins(S.luckUntil));
 const title=S.title?TITLES.find(t=>t.id===S.title):null;
  return`<div class="card"><div class="row2"><div class="thumb">${fighterArt(S.race)}</div><div style="flex:1;min-width:0"><div class="row"><h1 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.name)}</h1><div class="gold" style="font-weight:700;white-space:nowrap">🪙 <span id="zen">${fmt(S.zen)}</span></div></div>
  ${title?`<div class="gold" style="font-size:13px;margin-top:-2px">🌟 ${esc(title.n)}</div>`:''}
@@ -1023,7 +1027,7 @@ function tick(){updateDayNight();if(!S)return;regen(S);
  const st=stats(S),el=id=>document.getElementById(id);
  if(el('hpb')){el('hpb').style.width=clamp(S.hp/st.hp*100,0,100)+'%';el('hpt').textContent=fmt(S.hp)+' / '+fmt(st.hp);el('xpb').style.width=clamp(S.xp/xpNeed(S.lvl)*100,0,100)+'%';el('xpt').textContent=S.lvl>=MAXLVL?'MAX':fmt(S.xp)+' / '+fmt(xpNeed(S.lvl));el('zen').textContent=fmt(S.zen)}
  if(el('cdb')){const cd=cooldownMs(),left=Math.max(0,cd-(Date.now()-S.lastBattle));el('cdb').style.width=(cd?100-left/cd*100:100)+'%';el('cdt').textContent=left>0?`Ilsisi… ${Math.ceil(left/1000)} s`:S.hp<=1?'Per sužeistas':'Paruošta kovai';document.querySelectorAll('.fb').forEach(b=>b.disabled=left>0||S.hp<=1)}
- if(t&&el('trb')){const tot=t.end-t.start,left=Math.max(0,t.end-Date.now());el('trb').style.width=(100-left/tot*100)+'%';const s=Math.ceil(left/1000);el('trt').textContent=s>=60?Math.floor(s/60)+' min '+s%60+' s':s+' s';el('rushc').textContent=fmt(Math.ceil(left/1000*1.5))}
+ if(t&&el('trb')){const tot=t.end-t.start,left=Math.max(0,t.end-Date.now());el('trb').style.width=(100-left/tot*100)+'%';const s=Math.ceil(left/1000);el('trt').textContent=s>=60?Math.floor(s/60)+' min '+s%60+' s':s+' s';el('rushc').textContent=fmt(Math.ceil(left/1000*(1.5+((t.tier||0)*.9))))}
  if(el('fishbtn')){const now=Date.now(),c=S.camp,fcd=Math.max(0,FISH_CD-(now-c.lastFish)),hcd=Math.max(0,HUNT_CD-(now-c.lastHunt)),flcd=Math.max(0,FLINT_CD-(now-(c.lastFlint||0))),chcd=Math.max(0,CHOP_CD-(now-(c.lastChop||0))),mncd=Math.max(0,MINE_CD-(now-(c.lastMine||0))),fireOn=c.fireUntil>now;
   const fb=el('fishbtn');fb.disabled=!c.rod||fcd>0;fb.textContent='🎣 Žvejoti'+(fcd>0?' ('+Math.ceil(fcd/1000)+'s)':'');
   const hb=el('huntbtn');hb.disabled=!c.bow||hcd>0;hb.textContent='🏹 Medžioti'+(hcd>0?' ('+Math.ceil(hcd/1000)+'s)':'');
@@ -1045,7 +1049,7 @@ function resultHtml(r){const c='style="text-align:center;margin:6px 0"';
  ${r.win?`<p ${c}><span class="ok">+${fmt(r.xp)} XP</span> · <span class="gold">+${fmt(r.zen)} 🪙</span>${r.pvp?` · <span class="ok">+${r.dr} 🏅</span>`:''}</p>`:r.wb&&r.zen?`<p ${c}><span class="gold">+${fmt(r.zen)} 🪙</span> (dalinis atlygis už žalą)</p>`:`<p class="bad" ${c}>Gyvybės nukrito iki 10%.${r.pvp&&r.dr?' '+r.dr+' 🏅':''}</p>`}
  ${r.item?`<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0">${itemArt(r.item)}<span>🎁 ${itemLine(r.item)}</span> <span class="tag" style="color:${RAR[r.item.r].c}">${RAR[r.item.r].n}</span></div>`:''}${r.sold?`<p class="mut" ${c}>Kuprinė pilna — daiktas parduotas už ${r.sold} 🪙</p>`:''}
  ${r.rune?`<p ${c}><span class="gold">${RUNES[r.rune.k].ico} Rasta ${esc(RUNES[r.rune.k].n)} (+${r.rune.val})</span></p>`:r.runeFull?`<p class="mut" ${c}>Runų maišelis pilnas — rasta runa prarasta.</p>`:''}
- ${r.crystal?`<p class="gold" ${c}>💎 ${r.crystal==='full'?'Surinkai 7 kristalus! +25% galia 30 min.':'Žvaigždžių kristalas ('+S.crystals+'/7)'}</p>`:''}${r.lvlUp?`<p class="ok" ${c} style="font-size:18px">⬆️ Naujas lygis: ${S.lvl}!</p>`:''}
+ ${r.crystal?(typeof r.crystal==='object'?`<p class="gold" ${c}>💎 Surinkai 7 kristalus! ${r.crystal.kind==='zen'?'+'+fmt(r.crystal.zen)+' 🪙':r.crystal.kind==='power'?'+15% galia 20 min.':'🎁 legendinis daiktas!'}</p>`:`<p class="gold" ${c}>💎 Žvaigždžių kristalas (${S.crystals}/7)</p>`):''}${r.lvlUp?`<p class="ok" ${c} style="font-size:18px">⬆️ Naujas lygis: ${S.lvl}!</p>`:''}
  ${r.comp?`<p class="gold" ${c}>${r.comp.dup?`${r.comp.ico} Palydovas jau turimas — gauta ${r.comp.zen} 🪙 kompensacija`:`${r.comp.ico} Naujas palydovas: ${esc(r.comp.n)}!`}</p>`:''}
  ${r.compLvl?`<p class="ok" ${c}>${r.compLvl.ico} ${esc(r.compLvl.n)} pasiekė ${r.compLvl.lvl} lygį!</p>`:''}
  ${r.survival&&r.win?`<p ${c}><span class="tag">🌊 Banga ${r.wave}</span>${r.newBest?' <span class="tag gold">🏆 Naujas rekordas!</span>':''}</p>`:''}
@@ -1230,7 +1234,7 @@ function act(a,arg,btn){
 function adminGive(k){const now=Date.now();
  if(k==='zen')S.zen+=1000;
  if(k==='lvl'&&S.lvl<MAXLVL){S.lvl++;S.xp=0;S.hp=stats(S).hp}
- if(k==='cry'){const res={};Server.addCrystal(S,res,now);if(res.crystal==='full')toast('✨ Kristalų galia aktyvuota')}
+ if(k==='cry'){const res={};Server.addCrystal(S,res,now);if(typeof res.crystal==='object')toast('✨ Kristalų rinkinys surinktas')}
  if(k==='heal')S.hp=stats(S).hp;
  if(k==='cd')S.lastBattle=0;
  if(k==='train'&&S.training)S.training.end=now;
