@@ -297,8 +297,11 @@ function hofUpdate(p){const h=hofLoad();const pw=power(stats(p));
  let changed=false;for(const k in cands){const v=cands[k].v;if(!h[k]||v>h[k].v){h[k]={v,n:p.name,d:Date.now()};changed=true}}
  if(changed)hofSave(h);return h}
 
-function newState(name,race){const now=Date.now();return{v:3,name,race,lvl:1,xp:0,hp:0,hpT:now,zen:30,train:{atk:0,def:0,hp:0,spd:0},training:null,equip:{},inv:[],runes:[],crystals:0,buffUntil:0,xpUntil:0,luckUntil:0,potions:1,lastBattle:0,wins:0,losses:0,bosses:0,legends:0,sets:0,arenaW:0,arenaL:0,rating:1000,actions:0,daily:{last:'',streak:0},ach:{},comp:{owned:[],active:null,lvl:{},xp:{},exped:null},today:{d:'',win:0,boss:0,train:0,arena:0,sell:0,spend:0},quests:{d:'',ids:[],claimed:[]},prestige:0,camp:{rod:false,bow:false,axe:false,pick:false,fireUntil:0,lastFish:0,lastHunt:0,lastFlint:0,lastChop:0,lastMine:0,wood:0,stone:0,raw:{fish:0,game:0},food:{fish:0,game:0}},town:{kalve:0,turgus:0,mokykla:0,izdine:0,uzeiga:0,bokstas:0,rezidencija:0,sandelis:0},farm:{plot:null,hen:false,cow:false,henLast:0,cowLast:0,crop:0,egg:0,milk:0},idleAt:now,missionIdx:0,wboss:{d:'',claimed:false,dmg:0},tour:{wk:'',claimed:false},weekly:{wk:'',claimed:false},talent:null,title:null,survival:{wave:0,best:0},keys:0,dungeon:null,ascend:0,craftBuffUntil:0,lastSeen:now,fishCaught:0,dungeonsWon:0,craftCount:0,created:now,idc:1}}
-function migrate(p){const d=newState(p.name,p.race);for(const k in d)if(p[k]===undefined)p[k]=d[k];
+function newState(name,race){const now=Date.now();return{v:3,name,race,lvl:1,xp:0,hp:0,hpT:now,zen:30,train:{atk:0,def:0,hp:0,spd:0},training:null,equip:{},inv:[],runes:[],crystals:0,buffUntil:0,xpUntil:0,luckUntil:0,potions:1,lastBattle:0,wins:0,losses:0,bosses:0,legends:0,sets:0,arenaW:0,arenaL:0,rating:1000,actions:0,daily:{last:'',streak:0},ach:{},comp:{owned:[],active:null,lvl:{},xp:{},exped:null},today:{d:'',win:0,boss:0,train:0,arena:0,sell:0,spend:0},quests:{d:'',ids:[],claimed:[]},prestige:0,camp:{rod:false,bow:false,axe:false,pick:false,fireUntil:0,lastFish:0,lastHunt:0,lastFlint:0,lastChop:0,lastMine:0,wood:0,stone:0,raw:{fish:0,game:0},food:{fish:0,game:0}},town:{kalve:0,turgus:0,mokykla:0,izdine:0,uzeiga:0,bokstas:0,rezidencija:0,sandelis:0},farm:{plot:null,hen:false,cow:false,henLast:0,cowLast:0,crop:0,egg:0,milk:0},idleAt:now,missionIdx:0,wboss:{d:'',claimed:false,dmg:0},tour:{wk:'',claimed:false},weekly:{wk:'',claimed:false},talent:null,title:null,survival:{wave:0,best:0},keys:0,dungeon:null,ascend:0,craftBuffUntil:0,lastSeen:now,fishCaught:0,dungeonsWon:0,craftCount:0,statPts:0,alloc:{atk:0,def:0,hp:0,spd:0},created:now,idc:1}}
+const LEVEL_PTS=3;
+function migrate(p){const hadNoStatPts=p.statPts===undefined;const d=newState(p.name,p.race);for(const k in d)if(p[k]===undefined)p[k]=d[k];
+ if(hadNoStatPts)p.statPts=Math.max(0,(p.lvl-1))*LEVEL_PTS;
+ if(!p.alloc)p.alloc={atk:0,def:0,hp:0,spd:0};
  if(p.town)for(const k in d.town)if(p.town[k]===undefined)p.town[k]=d.town[k];
  if(p.farm)for(const k in d.farm)if(p.farm[k]===undefined)p.farm[k]=d.farm[k];
  if(p.idleAt===undefined)p.idleAt=Date.now();
@@ -310,8 +313,8 @@ function migrate(p){const d=newState(p.name,p.race);for(const k in d)if(p[k]===u
  for(const s in p.equip){const it=p.equip[s];if(it&&!it.sockets)it.sockets=new Array(sockCount(it)).fill(null);if(it&&it.r===3&&!it.proc)it.proc=pick(LEG_PROCS).id}
  for(const it of p.inv){if(!it.sockets)it.sockets=new Array(sockCount(it)).fill(null);if(it.r===3&&!it.proc)it.proc=pick(LEG_PROCS).id}
  p.v=4;return p}
-function stats(p){const r=RACES[p.race],b=base(p.lvl);
- let atk=b.atk+p.train.atk*TRAIN.atk.per,def=b.def+p.train.def*TRAIN.def.per,hp=b.hp+p.train.hp*TRAIN.hp.per,spd=b.spd+p.train.spd*TRAIN.spd.per;
+function stats(p){const r=RACES[p.race],b=base(p.lvl),al=p.alloc||{atk:0,def:0,hp:0,spd:0};
+ let atk=b.atk+(p.train.atk+al.atk)*TRAIN.atk.per,def=b.def+(p.train.def+al.def)*TRAIN.def.per,hp=b.hp+(p.train.hp+al.hp)*TRAIN.hp.per,spd=b.spd+(p.train.spd+al.spd)*TRAIN.spd.per;
  for(const s in p.equip){const it=p.equip[s];if(it){const m=1+.1*(it.up||0);atk+=it.atk*m;def+=it.def*m;hp+=it.hp*m;
   if(it.sockets)for(const rn of it.sockets)if(rn){if(rn.k==='atk')atk+=rn.val;else if(rn.k==='def')def+=rn.val;else if(rn.k==='hp')hp+=rn.val;else if(rn.k==='spd')spd+=rn.val}}}
  const buff=p.buffUntil>Date.now()?1.25:1,cb=p.craftBuffUntil>Date.now()?1.1:1,pm=(1+.05*(p.prestige||0))*(1+.15*(p.ascend||0)),th=1+.02*((p.town&&p.town.uzeiga)||0),sb=1+setBonus(p).mul;
@@ -352,7 +355,7 @@ function simulate(P,E,php,procs){procs=procs||{};
   turn^=1;rounds++}
  return{win:eh<=0&&ph>0,php:Math.max(0,Math.round(ph)),rounds,log}}
 function estimate(P,E,hp,n,procs){n=n||60;let w=0;for(let i=0;i<n;i++)if(simulate(P,E,hp,procs).win)w++;return Math.round(w/n*100)}
-function gainXp(p,x){p.xp+=x;let n=0;while(p.lvl<MAXLVL&&p.xp>=xpNeed(p.lvl)){p.xp-=xpNeed(p.lvl);p.lvl++;n++}if(p.lvl>=MAXLVL)p.xp=Math.min(p.xp,xpNeed(p.lvl));if(n)p.hp=stats(p).hp;return n}
+function gainXp(p,x){p.xp+=x;let n=0;while(p.lvl<MAXLVL&&p.xp>=xpNeed(p.lvl)){p.xp-=xpNeed(p.lvl);p.lvl++;n++}if(p.lvl>=MAXLVL)p.xp=Math.min(p.xp,xpNeed(p.lvl));if(n){p.statPts=(p.statPts||0)+n*LEVEL_PTS;p.hp=stats(p).hp}return n}
 const xpM=(p,now)=>CFG.xpMul*(p.xpUntil>now?1.5:1)*(1+.05*((p.town&&p.town.mokykla)||0));
 const zenM=p=>1+.05*((p.town&&p.town.izdine)||0);
 const sellM=p=>1+.05*((p.town&&p.town.turgus)||0);
@@ -375,6 +378,8 @@ const Server={
  gainCompXp(p,res){const id=p.comp&&p.comp.active;if(!id)return;if(!p.comp.lvl)p.comp.lvl={};if(!p.comp.xp)p.comp.xp={};
   const lvl=p.comp.lvl[id]||1;if(lvl>=COMP_MAXLVL)return;p.comp.xp[id]=(p.comp.xp[id]||0)+1;const need=compXpNeed(lvl);
   if(p.comp.xp[id]>=need){p.comp.xp[id]=0;p.comp.lvl[id]=lvl+1;const c=COMPANIONS.find(x=>x.id===id);res.compLvl={id,lvl:lvl+1,n:c.n,ico:c.ico}}},
+ allocPoint(p,stat){if(!TRAIN[stat])return{err:'?'};if((p.statPts||0)<1)return{err:'Nėra laisvų taškų.'};
+  p.statPts--;p.alloc=p.alloc||{atk:0,def:0,hp:0,spd:0};p.alloc[stat]=(p.alloc[stat]||0)+1;p.hp=Math.min(stats(p).hp,p.hp+(stat==='hp'?TRAIN.hp.per:0));return{ok:1}},
  startExpedition(p,id){if(!p.comp.owned.includes(id))return{err:'Palydovas nerastas.'};
   if(p.comp.active===id)return{err:'Šis palydovas kovoja su tavimi — pasirink kitą arba pakeisk aktyvų.'};
   if(p.comp.exped)return{err:'Jau turi vykstančią ekspediciją.'};
@@ -725,10 +730,13 @@ function tabKova(){const z=ZONES[ui.zone],P=stats(S),dn=Server.dailyNext(S);
  return banner()+(dn?`<div class="banner"><div class="row"><span>🎁 Dienos dovana · ${dn}/7 diena${dn===7?' (+2 🧪 +1 💎)':''}</span><button class="sm pri" data-act="daily">Atsiimti</button></div></div>`:'')+header()
  +`<div class="chips" style="margin-bottom:10px">${zs}</div><div class="zonebn">${zoneArt(z)}<div class="lbl">${z.ico} ${z.name}<small>Nuo ${z.lvl} lygio · bosas: ${esc(z.boss)}</small></div></div>`
  +cdCard(`<button class="sm" data-act="potion" ${S.potions?'':'disabled'}>🧪 Gerti (${S.potions})</button>`)+`<div class="grid" style="margin-bottom:12px">${opts}</div>`+questCard()+wbossCard()+weeklyCard()+survivalCard()+dungeonCard()}
+function allocCard(){const al=S.alloc||{atk:0,def:0,hp:0,spd:0},pts=S.statPts||0;
+ const rows=Object.keys(TRAIN).map(k=>{const T=TRAIN[k];return`<div class="row2" style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><b>${T.ico} ${T.n}</b><div class="mut">Paskirstyta: ${al[k]||0} tšk. (+${Math.round((al[k]||0)*T.per)} ${T.u})</div></div><button class="sm" data-act="alloc" data-arg="${k}" ${pts<1?'disabled':''}>+1</button></div>`}).join('');
+ return`<div class="card"><div class="row"><h2 style="margin:0">⭐ Lygio taškai</h2><span class="tag ${pts?'gold':''}">${pts} laisvi</span></div><p class="mut" style="margin:6px 0">Už kiekvieną lygį gauni ${LEVEL_PTS} taškus — paskirstyk juos tarp jėgos, gynybos, gyvybės ir greičio visam laikui.</p>${rows}</div>`}
 function tabTrain(){let cur='';const t=S.training;
  if(t){const T=TRAIN[t.stat];cur=`<div class="card"><h2>Treniruojiesi</h2><div class="row"><b>${T.ico} ${T.n} +${t.pts}</b><span id="trt" class="mut"></span></div><div style="margin-top:6px">${bar('xp','trb',0)}</div><div style="margin-top:10px"><button class="sm" data-act="rush">⏩ Pagreitinti už <span id="rushc"></span> 🪙</button></div></div>`}
  const cards=Object.keys(TRAIN).map(k=>{const T=TRAIN[k];return`<div class="card"><div class="row"><b>${T.ico} ${T.n}</b><span class="mut">${S.train[k]} tšk. (+${Math.round(S.train[k]*T.per)} ${T.u})</span></div><div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px">${TIERS.map((x,i)=>{const s=Math.round(x.s*RACES[S.race].train*trainM(S)),pts=Math.round(x.m*(1+Math.floor(S.lvl/4)));return`<button class="sm" style="text-align:center;width:100%" data-act="train" data-arg="${k}:${i}" ${t?'disabled':''}>${s>=60?Math.round(s/60)+' min':s+' s'}<br><b>+${pts}</b></button>`}).join('')}</div></div>`}).join('');
- return banner()+header()+cur+'<h2>Treniruotės</h2>'+cards+'<p class="mut">Treniruotės vyksta realiu laiku — gali uždaryti žaidimą ir grįžti vėliau.</p>'}
+ return banner()+header()+cur+allocCard()+'<h2>Treniruotės</h2>'+cards+'<p class="mut">Treniruotės vyksta realiu laiku — gali uždaryti žaidimą ir grįžti vėliau.</p>'}
 function socketsHtml(it,slotKey){if(!it.sockets)it.sockets=new Array(sockCount(it)).fill(null);
  if(!it.sockets.length)return'<span class="mut" style="font-size:12px">Lizdų nėra (nuo Retumo)</span>';
  return it.sockets.map((rn,i)=>rn?`<button class="sm" title="${esc(RUNES[rn.k].n)} +${rn.val}" data-act="unsockrune" data-arg="${slotKey}:${i}" style="padding:3px 6px">${RUNES[rn.k].ico}+${rn.val}</button>`:`<span class="tag mut" style="padding:3px 7px">⬡</span>`).join(' ')}
@@ -1036,6 +1044,7 @@ function act(a,arg,btn){
  else if(a==='title'){const r=Server.setTitle(S,arg||null);if(r.err){toast(r.err);Snd.play('err');return}toast(arg?'🏅 Titulas pasirinktas':'Titulas nuimtas')}
  else if(a==='sharecard'){shareCard();toast('📤 Kortelė ruošiama atsisiuntimui…');return}
  else if(a==='notif'){Notif.toggle().then(r=>{if(r==='on')toast('🔔 Pranešimai įjungti');else if(r==='off')toast('🔕 Pranešimai išjungti');else if(r==='denied'||r==='declined')toast('Pranešimai užblokuoti naršyklės nustatymuose');else if(r==='unsupported')toast('Naršyklė nepalaiko pranešimų');render()});return}
+ else if(a==='alloc'){const r=Server.allocPoint(S,arg);if(r.err){toast(r.err);Snd.play('err');return}Snd.play('coin')}
  else if(a==='expedstart'){const r=Server.startExpedition(S,arg);if(r.err){toast(r.err);Snd.play('err');return}toast('🧭 Ekspedicija prasidėjo');Snd.play('coin')}
  else if(a==='claimexped'){const r=Server.claimExpedition(S);if(r.err){toast(r.err);Snd.play('err');return}toast(`🧭 ${r.ico} ${r.n} grįžo: +${fmt(r.zen)} 🪙${r.item?' + daiktas':''}`);Snd.play('coin')}
  else if(a==='lang'){ACCESS.lang=arg;accessSave();accessApply();render();return}
