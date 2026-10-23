@@ -1022,13 +1022,15 @@ function resultHtml(r){const c='style="text-align:center;margin:6px 0"';
  ${r.survival&&!r.win?`<p class="mut" ${c}>Išgyvenai iki ${r.waveReached} bangos. Serija nutrūko.</p>`:''}
  ${r.keyDrop?`<p ${c}><span class="gold">🗝️ Rastas požemio raktas!</span></p>`:''}
  ${r.dungeon&&!r.win?`<p class="mut" ${c}>Požemis dar atidarytas — bandyk vėl, kol nesibaigė laikas.</p>`:''}
- <button class="sm" id="copylogbtn" style="width:100%;margin-top:8px">📋 Kopijuoti kovos žurnalą</button>`}
+ <details open style="margin-top:10px"><summary class="mut" style="cursor:pointer">📜 Kovos žurnalas</summary>
+ <pre id="logtext" style="white-space:pre-wrap;font-size:12px;line-height:1.5;max-height:220px;overflow:auto;background:rgba(255,255,255,.04);border-radius:8px;padding:8px;margin:6px 0">${esc(battleLogText(r))}</pre>
+ <button class="sm" id="copylogbtn" style="width:100%">📋 Kopijuoti</button></details>`}
 function battleLogText(r){const lines=[`⚔️ ${S.name} vs ${r.e.name} — ${r.win?'PERGALĖ':'PRALAIMĖJIMAS'} (${r.rounds} smūgių)`];
  (r.log||[]).forEach((x,i)=>{
-  if(x.stun)lines.push(`${i+1}. 😵 ${esc(r.e.name)} apsvaigintas`);
-  else if(x.heal)lines.push(`${i+1}. ✨ ${esc(S.name)} atgauna ${x.heal} GP (${RACE_SKILL_BY_ID[x.skill].n})`);
+  if(x.stun)lines.push(`${i+1}. 😵 ${r.e.name} apsvaigintas`);
+  else if(x.heal)lines.push(`${i+1}. ✨ ${S.name} atgauna ${x.heal} GP (${RACE_SKILL_BY_ID[x.skill].n})`);
   else{const who=x.me?S.name:r.e.name,tags=[x.combo?'🔗KOMBO':'',x.comp?'🐾Palydovas':'',x.skill?RACE_SKILL_BY_ID[x.skill].n:'',x.crit?'💥KRIT':''].filter(Boolean).join(' ');
-   lines.push(`${i+1}. ${esc(who)} suduoda ${x.d} žalos${tags?' ['+tags+']':''}`)}});
+   lines.push(`${i+1}. ${who} suduoda ${x.d} žalos${tags?' ['+tags+']':''}`)}});
  lines.push(r.win?`🏆 Laimėta! +${fmt(r.xp||0)} XP, +${fmt(r.zen||0)} 🪙`:'💀 Pralaimėta.');
  return lines.join('\n')}
 function shareBattleLog(r){const txt=battleLogText(r);
