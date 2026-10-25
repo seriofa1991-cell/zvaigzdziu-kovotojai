@@ -908,17 +908,29 @@ function activeSkillCard(){const sk=ACTIVE_SKILLS[S.race],now=Date.now(),wait=AC
  return`<div class="card"><div class="row"><h2 style="margin:0">⚡ ${esc(sk.n)}</h2>${S.activeArmed?'<span class="tag ok">🔥 Paruoštas</span>':''}</div>
  <p class="mut" style="margin:6px 0">${sk.d}. Veikia kitai bet kuriai kovai (vienkartinis).</p>
  <button class="sm pri" data-act="useskill" ${S.activeArmed||wait>0?'disabled':''}>${S.activeArmed?'Paruoštas — pulk!':wait>0?'⏳ '+Math.ceil(wait/60000)+' min.':'⚡ Panaudoti'}</button></div>`}
+function bossUnreadCount(){let n=0;const day=dstr(Date.now());
+ if(!S.wboss||S.wboss.d!==day||!S.wboss.claimed)n++;
+ const wk=wkstr(Date.now());if(!S.weekly||S.weekly.wk!==wk||!S.weekly.claimed)n++;
+ if(!S.season||S.season.d!==day||!S.season.claimed)n++;
+ if(!S.marathon||S.marathon.d!==day||!S.marathon.claimed)n++;
+ return n}
+function tabBosses(){return banner()+header()+`<button class="sm" data-act="bossback" style="margin-bottom:10px">← Atgal</button>
+ <h2 style="margin:0 0 4px">👑 Bosai ir iššūkiai</h2><p class="mut" style="margin-top:0">Visi specialūs bosai ir laiko ribojami iššūkiai vienoje vietoje.</p>
+ ${wbossCard()}${weeklyCard()}${seasonCard()}${marathonCard()}${survivalCard()}${dungeonCard()}`}
 function tabKova(){const z=ZONES[ui.zone],P=stats(S),dn=Server.dailyNext(S);
+ if(ui.bossScreen)return tabBosses();
  const zs=ZONES.map((q,i)=>`<button class="${ui.zone===i?'sel':''}" data-act="zone" data-arg="${i}" ${S.lvl<q.lvl?'disabled':''}>${q.ico} ${q.name}${S.lvl<q.lvl?' 🔒'+q.lvl:''}</button>`).join('');
  const nmOn=!!ui.nightmare;
  const opts=Server.options(S,ui.zone).map(o=>{const el=ELEMENTS.find(x=>x.id===o.elem),weak=P.elem&&P.elem===o.elem,hp2=nmOn?Math.round(o.hp*1.8):o.hp,atk2=nmOn?o.atk*1.5:o.atk,def2=nmOn?o.def*1.3:o.def,o2=nmOn?{...o,hp:hp2,atk:atk2,def:def2}:o;
   return`<button data-act="fight" data-arg="${o.i}" class="fb${nmOn?' nm':''}"><div class="row2"><div class="thumb">${monsterArt(o.name,z,o.boss)}</div><div style="flex:1;min-width:0"><div class="row"><b>${nmOn?'💀 ':''}${o.boss?'👑 ':''}${esc(o.name)}</b><span class="tag">${o.k} · ${o.L}</span>${el?`<span class="tag" style="${weak?'color:var(--ok);border-color:var(--ok)':''}">${el.ico} ${el.n}${weak?' ⚡ Silpnybė!':''}</span>`:''}</div><div class="mut">❤️ ${fmt(hp2)} · ⚔️ ${fmt(atk2)} · 🛡️ ${fmt(def2)}</div><div class="mut">Laimėjimo šansas: ${chanceTag(estimate(P,o2,S.hp,60,activeProcs(S)))}</div></div></div></button>`}).join('');
  const nextMileDay=((S.daily.total||0)%30)+1,nextMile=MONTHLY_MILESTONES[nextMileDay];
+ const bossN=bossUnreadCount();
  return(!S.tutSeen||ui.forceGuide?guideCard():'')+banner()+(dn?`<div class="banner"><div class="row"><span>🎁 Dienos dovana · ${dn}/7 diena${dn===7?' (+2 🧪 +1 💎)':''}${nextMile?' · 📅 '+nextMileDay+'/30 mėn. diena!':''}</span><button class="sm pri" data-act="daily">Atsiimti</button></div></div>`:'')+header()
  +`<div class="chips" style="margin-bottom:10px">${zs}</div><div class="zonebn">${zoneArt(z)}<div class="lbl">${z.ico} ${z.name}<small>Nuo ${z.lvl} lygio · bosas: ${esc(z.boss)}</small></div></div>`
  +cdCard(`<button class="sm" data-act="potion" ${S.potions?'':'disabled'}>🧪 Gerti (${S.potions})</button><button class="sm${nmOn?' pri':''}" data-act="nightmare">💀 Košmaro režimas ${nmOn?'✔️':''}</button>`)
  +(nmOn?`<p class="mut" style="margin:4px 0 10px">Priešai +80% gyvybių, +50% puolimo, +30% gynybos — bet +60% XP/🪙 ir geresnis grobis.</p>`:'')
- +`<div class="grid" style="margin-bottom:12px">${opts}</div>`+activeSkillCard()+questCard()+wbossCard()+weeklyCard()+seasonCard()+marathonCard()+survivalCard()+dungeonCard()}
+ +`<div class="grid" style="margin-bottom:12px">${opts}</div>`+activeSkillCard()+questCard()
+ +`<button class="pri fb" data-act="bosses" style="width:100%;margin-bottom:12px">👑 Bosai ir iššūkiai${bossN?` <span class="tag gold">${bossN}</span>`:''}</button>`}
 function marathonCard(){const day=dstr(Date.now());if(!S.marathon)S.marathon={d:'',claimed:false,best:0};
  const claimed=S.marathon.d===day&&S.marathon.claimed,n=ZONES.filter(z=>S.lvl>=z.lvl).length;
  return`<div class="card"><div class="row"><h2 style="margin:0">🔥 Bosų maratonas</h2><span class="tag">Geriausias: ${S.marathon.best||0}/${n}</span></div>
@@ -1324,9 +1336,11 @@ function act(a,arg,btn){
  if(a==='friendadd'){const n=($('#fname')||{}).value;const r=Server.friendAdd(S,n);if(r.err){toast(r.err);Snd.play('err');return}toast('🤝 Draugas pridėtas');save();render();return}
  if(a==='friendremove'){Server.friendRemove(S,arg);save();render();return}
  if(a==='useskill'){const r=Server.useActiveSkill(S);if(r.err){toast(r.err);Snd.play('err');return}toast('⚡ Įgūdis paruoštas kitai kovai!');Snd.play('lvl');save();render();return}
+ if(a==='bosses'){ui.bossScreen=true;render();scrollTo(0,0);return}
+ if(a==='bossback'){ui.bossScreen=false;render();scrollTo(0,0);return}
  if(a==='race'){const n=$('#nm');if(n)ui.name=n.value;ui.race=arg;render();return}
  if(a==='create'){const n=($('#nm').value||'').trim();if(n.length<2){toast('Įvesk vardą (bent 2 raidės).');Snd.play('err');return}S=newState(n,ui.race);S.tutSeen=false;S.hp=stats(S).hp;save();ui.tab='kova';ui.zone=0;render();Snd.play('lvl');return}
- if(a==='tab'){ui.tab=arg;render();scrollTo(0,0);return}
+ if(a==='tab'){ui.tab=arg;ui.bossScreen=false;render();scrollTo(0,0);return}
  if(a==='alogin'){const v=($('#apw').value||'');sha(v).then(h=>{if(h===null){toast('Admin veikia tik per https://');return}if(h===ADMIN_HASH){ui.admin=true;try{sessionStorage.setItem('zk_admin','1')}catch(e){}toast('Prisijungta');render()}else{toast('Neteisingas slaptažodis');Snd.play('err')}});return}
  if(a==='alogout'){ui.admin=false;try{sessionStorage.removeItem('zk_admin')}catch(e){}ui.tab=S?'prof':'kova';render();return}
  if(a==='asave'||a==='aimg'||a==='aexp'||a==='aimp'||a==='adef'){if(!ui.admin)return;adminCfg(a);render();return}
