@@ -97,8 +97,24 @@ details summary{cursor:pointer;padding:4px 0}
 <div id="app"></div>
 <div id="daynight" style="position:fixed;inset:0;pointer-events:none;z-index:5;transition:background 3s linear;mix-blend-mode:multiply"></div>
 <div id="toast"></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 'use strict';
+/* ===== Firebase (realus serveris — paskyros, išsaugojimai, gildijos, draugai, puolimai tarp įrenginių) ===== */
+const firebaseConfig={apiKey:"AIzaSyDjdt_M0jUXToAX3Plf1fDNdTnphe35tJ8",authDomain:"zvaigzdziu-kovotojai.firebaseapp.com",projectId:"zvaigzdziu-kovotojai",storageBucket:"zvaigzdziu-kovotojai.firebasestorage.app",messagingSenderId:"1040886763628",appId:"1:1040886763628:web:bb35dda9b725632dae0849",measurementId:"G-SWQXG1K6T6"};
+let fbAuth=null,fbDb=null,fbOK=false;
+try{if(window.firebase){firebase.initializeApp(firebaseConfig);fbAuth=firebase.auth();fbDb=firebase.firestore();fbOK=true}}catch(e){console.warn('Firebase init nepavyko',e)}
+const emailFor=uk=>uk+'@zk-player.app';
+function authErr(err){const c=err&&err.code;
+ if(c==='auth/email-already-in-use')return'Toks vartotojo vardas jau užimtas.';
+ if(c==='auth/weak-password')return'Per silpnas slaptažodis (bent 6 simboliai).';
+ if(c==='auth/wrong-password'||c==='auth/invalid-credential'||c==='auth/user-not-found')return'Neteisingas vardas arba slaptažodis.';
+ if(c==='auth/too-many-requests')return'Per daug bandymų. Palauk ir bandyk vėliau.';
+ if(c==='auth/network-request-failed')return'Nėra interneto ryšio.';
+ if(c&&c.indexOf('zk/')===0)return err.msg||'Klaida.';
+ return'Nepavyko prisijungti prie serverio. Bandyk dar kartą.'}
 /* ================= ŽVAIGŽDŽIŲ KOVOTOJAI v2 — variklis =================
    Visa kovų/ekonomikos logika yra objekte Server. Dabar jis veikia naršyklėje (demo),
    vėliau perkeliamas į Netlify/Firebase funkciją, kad nebūtų galima sukčiauti. */
@@ -635,52 +651,8 @@ const Server={
   if(p.spec){const cost=specCost(p);if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;p.spec=id;return{ok:1,cost}}
   p.spec=id;return{ok:1,cost:0}},
  setTitle(p,id){if(!id){p.title=null;return{ok:1}}const t=TITLES.find(x=>x.id===id);if(!t)return{err:'?'};const have=t.kind==='ascend'?(p.ascend||0):(p.prestige||0);if(have<t.req)return{err:'Reikia '+t.req+(t.kind==='ascend'?' pakilimo(-ų).':' pakylėjimo(-ų).')};p.title=id;return{ok:1}},
- guildCreate(p,name,ico){if(p.guild)return{err:'Jau esi gildijoje.'};name=(name||'').trim();if(name.length<3)return{err:'Pavadinimas — bent 3 raidės.'};
-  if(GUILD_COST>p.zen)return{err:'Neužtenka monetų ('+GUILD_COST+').'};
-  const gs=guildLoad();if(Object.values(gs).some(g=>g.name.toLowerCase()===name.toLowerCase()))return{err:'Tokia gildija jau egzistuoja.'};
-  const id='g'+Date.now()+Math.floor(Math.random()*1000);
-  gs[id]={id,name,ico:GUILD_ICOS.includes(ico)?ico:GUILD_ICOS[0],founder:USER,created:Date.now(),treasury:0,members:[{id:USER,role:'founder',joined:Date.now()}]};
-  guildSave(gs);p.zen-=GUILD_COST;p.guild=id;return{ok:1,id}},
- guildJoin(p,id){if(p.guild)return{err:'Jau esi gildijoje.'};const gs=guildLoad(),g=gs[id];if(!g)return{err:'Gildija nerasta.'};
-  if(g.members.length>=30)return{err:'Gildija pilna.'};
-  g.members.push({id:USER,role:'member',joined:Date.now()});guildSave(gs);p.guild=id;return{ok:1}},
- guildLeave(p){if(!p.guild)return{err:'Nesi gildijoje.'};const gs=guildLoad(),g=gs[p.guild];
-  if(g){g.members=g.members.filter(m=>m.id!==USER);if(!g.members.length)delete gs[p.guild];else if(g.founder===USER)g.founder=g.members[0].id;guildSave(gs)}
-  p.guild=null;return{ok:1}},
- guildDonate(p,amt){if(!p.guild)return{err:'Nesi gildijoje.'};amt=Math.floor(amt);if(!amt||amt<1)return{err:'?'};if(amt>p.zen)return{err:'Neužtenka monetų.'};
-  const gs=guildLoad(),g=gs[p.guild];if(!g)return{err:'Gildija nerasta.'};p.zen-=amt;g.treasury=(g.treasury||0)+amt;
-  const m=g.members.find(x=>x.id===USER);if(m)m.contrib=(m.contrib||0)+amt;guildSave(gs);return{ok:1,amt,lvl:guildLevel(g)}},
- friendAdd(p,name){const uk=(name||'').trim().toLowerCase();if(!uk)return{err:'?'};if(uk===USER)return{err:'Tai tu pats.'};
-  const accs=accLoad();if(!accs[uk])return{err:'Tokio vartotojo nėra.'};
-  if(!p.friends)p.friends=[];if(p.friends.includes(uk))return{err:'Jau draugas.'};
-  if(p.friends.length>=30)return{err:'Draugų sąrašas pilnas.'};p.friends.push(uk);return{ok:1}},
  friendRemove(p,uk){if(!p.friends)return{err:'?'};p.friends=p.friends.filter(f=>f!==uk);return{ok:1}},
- guildDonateItem(p,id){if(!p.guild)return{err:'Nesi gildijoje.'};const i=p.inv.findIndex(x=>x.id===id);if(i<0)return{err:'?'};
-  const gs=guildLoad(),g=gs[p.guild];if(!g)return{err:'Gildija nerasta.'};
-  const it=p.inv.splice(i,1)[0],val=Math.round(RAR[it.r].sell*(1+it.lv/10));g.treasury=(g.treasury||0)+val;
-  const m=g.members.find(x=>x.id===USER);if(m)m.contrib=(m.contrib||0)+val;guildSave(gs);return{ok:1,val,lvl:guildLevel(g)}},
  togglePublic(p){p.profilePublic=p.profilePublic===false;return{ok:1,pub:p.profilePublic}},
- raidFriend(p,uk){const now=Date.now();const chk=Server.ready(p,now);if(chk)return{err:chk};
-  uk=(uk||'').toLowerCase();if(!uk||uk===USER)return{err:'Negali užpulti savęs.'};
-  if(!p.raidCd)p.raidCd={};const last=p.raidCd[uk]||0;
-  if(now-last<RAID_CD)return{err:'Palauk '+Math.ceil((RAID_CD-(now-last))/3600000)+' val. prieš puldamas šį žaidėją vėl.'};
-  let raw;try{raw=JSON.parse(localStorage.getItem(userSaveKey(uk)))}catch(e){raw=null}
-  if(!raw)return{err:'Šis žaidėjas nerastas šiame įrenginyje.'};
-  const victim=migrate(raw);if(victim.profilePublic===false)return{err:'Žaidėjas paslėpė savo profilį.'};
-  if(victim.lvl<RAID_MIN_LVL)return{err:'Žaidėjas per žemo lygio užpuolimui (min. '+RAID_MIN_LVL+' lyg.).'};
-  regen(p);ensureToday(p);const P=stats(p),V=stats(victim),php0=p.hp;
-  const sim=simulate(P,{hp:V.hp,atk:V.atk,def:V.def,spd:V.spd,crit:V.crit,elem:V.elem,name:victim.name,boss:false},p.hp,activeProcs(p));
-  Server.after(p,P,sim,now);p.raidCd[uk]=now;
-  const res={raid:true,zi:0,win:sim.win,rounds:sim.rounds,log:sim.log,e:{name:victim.name,hp:V.hp,boss:false,race:victim.race},pmax:P.hp,pstart:php0,xp:0,zen:0,item:null,lvlUp:0,stolen:0,broke:null};
-  if(sim.win){const steal=Math.min(Math.round(victim.zen*RAID_STEAL_PCT),RAID_STEAL_MAX);
-   victim.zen=Math.max(0,victim.zen-steal);p.zen+=steal;res.stolen=steal;res.zen=steal;
-   const slots=Object.keys(victim.equip||{}).filter(s=>victim.equip[s]);
-   if(slots.length){const slot=pick(slots),it=victim.equip[slot];it.up=Math.max(0,(it.up||0)-1);
-    if(Math.random()<RAID_BREAK_CHANCE){delete victim.equip[slot];res.broke={slot,name:it.name,broken:true}}
-    else res.broke={slot,name:it.name,broken:false}}
-   res.xp=Math.round(10*Math.pow(victim.lvl,1.2)*xpM(p,now));res.lvlUp=gainXp(p,res.xp);
-   try{localStorage.setItem(userSaveKey(uk),JSON.stringify(victim))}catch(e){}}
-  return res},
  equip(p,id){const i=p.inv.findIndex(x=>x.id===id);if(i<0)return;const it=p.inv.splice(i,1)[0],old=p.equip[it.slot];if(old)p.inv.push(old);p.equip[it.slot]=it},
  unequip(p,slotKey){const it=p.equip[slotKey];if(!it)return{err:'?'};p.equip[slotKey]=null;
   if(p.inv.length>=invCap(p)){const z=Math.round(RAR[it.r].sell*(1+it.lv/10)*sellM(p));p.zen+=z;return{ok:1,sold:z}}
@@ -736,24 +708,136 @@ const ACC_KEY='zk_accounts',USER_KEY='zk_user';
 function accLoad(){try{return JSON.parse(localStorage.getItem(ACC_KEY))||{}}catch(e){return{}}}
 function accSave(a){try{localStorage.setItem(ACC_KEY,JSON.stringify(a))}catch(e){}}
 const userSaveKey=u=>'zk_v1_'+u;
-const GUILD_KEY='zk_guilds';
-function guildLoad(){try{return JSON.parse(localStorage.getItem(GUILD_KEY))||{}}catch(e){return{}}}
-function guildSave(g){try{localStorage.setItem(GUILD_KEY,JSON.stringify(g))}catch(e){}}
 const GUILD_ICOS=['🏰','⚔️','🛡️','🔥','❄️','🐉','🌟','🦅'];
 const GUILD_COST=500;
 function guildLevel(g){return Math.max(1,Math.floor(Math.sqrt((g.treasury||0)/300))+1)}
-function guildBonus(p){if(!p.guild)return 0;const gs=guildLoad(),g=gs[p.guild];if(!g)return 0;return Math.min(.15,guildLevel(g)*.02)}
+let GUILD_CACHE={},GUILD_LIST_CACHE=null,_guildFetchAt=0;
+function guildBonus(p){if(!p.guild)return 0;const g=GUILD_CACHE[p.guild];if(!g)return 0;return Math.min(.15,guildLevel(g)*.02)}
+function refreshGuildCache(id){if(!fbOK||!id)return Promise.resolve();
+ return fbDb.collection('guilds').doc(id).get().then(snap=>{
+  if(!snap.exists){delete GUILD_CACHE[id];return}
+  GUILD_CACHE[id]=snap.data();if(ui.tab==='guild'||ui.tab==='kova')render()
+ }).catch(e=>console.warn('guild fetch failed',e))}
+function refreshGuildList(){if(!fbOK)return Promise.resolve();
+ return fbDb.collection('guilds').orderBy('treasury','desc').limit(10).get().then(snap=>{
+  GUILD_LIST_CACHE=snap.docs.map(d=>d.data());if(ui.tab==='guild')render()
+ }).catch(e=>{GUILD_LIST_CACHE=GUILD_LIST_CACHE||[];console.warn('guild list failed',e)})}
 const RAID_CD=12*60*60000;
 const RAID_MIN_LVL=10;
 const RAID_STEAL_PCT=.18,RAID_STEAL_MAX=2000,RAID_BREAK_CHANCE=.12;
-function readUserLite(uk,viewerUk){try{const j=JSON.parse(localStorage.getItem(userSaveKey(uk)));if(!j)return null;const mj=migrate(j);
+const PROFILE_CACHE={};
+function fetchProfile(uk){if(!fbOK||PROFILE_CACHE[uk]!==undefined)return;
+ PROFILE_CACHE[uk]='loading';
+ fbDb.collection('saves').doc(uk).get().then(snap=>{
+  if(!snap.exists){PROFILE_CACHE[uk]='missing';render();return}
+  try{const raw=JSON.parse(snap.data().json),mj=migrate(raw);
+   PROFILE_CACHE[uk]={name:raw.name,race:raw.race,lvl:raw.lvl,power:power(stats(mj)),zen:raw.zen,equip:raw.equip,profilePublic:mj.profilePublic!==false};
+  }catch(e){PROFILE_CACHE[uk]='missing'}
+  render()
+ }).catch(()=>{PROFILE_CACHE[uk]='missing';render()})}
+function readUserLite(uk,viewerUk){if(!uk)return null;
  const isSelf=viewerUk&&viewerUk===uk;
- if(mj.profilePublic===false&&!isSelf)return{name:j.name,hidden:true};
- return{name:j.name,race:j.race,lvl:j.lvl,power:power(stats(mj)),zen:j.zen,equip:j.equip,hidden:false}}catch(e){}return null}
+ if(isSelf&&S)return{name:S.name,race:S.race,lvl:S.lvl,power:power(stats(S)),zen:S.zen,equip:S.equip,hidden:false};
+ const c=PROFILE_CACHE[uk];
+ if(c===undefined){fetchProfile(uk);return null}
+ if(c==='loading'||c==='missing')return null;
+ if(c.profilePublic===false)return{name:c.name,hidden:true};
+ return{name:c.name,race:c.race,lvl:c.lvl,power:c.power,zen:c.zen,equip:c.equip,hidden:false}}
+async function guildCreateAsync(name,ico){name=(name||'').trim();
+ if(S.guild)return{err:'Jau esi gildijoje.'};
+ if(name.length<3)return{err:'Pavadinimas — bent 3 raidės.'};
+ if(GUILD_COST>S.zen)return{err:'Neužtenka monetų ('+GUILD_COST+').'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const dup=await fbDb.collection('guilds').where('name','==',name).limit(1).get().catch(()=>null);
+ if(dup&&!dup.empty)return{err:'Tokia gildija jau egzistuoja.'};
+ const ref=fbDb.collection('guilds').doc();
+ const doc={id:ref.id,name,ico:GUILD_ICOS.includes(ico)?ico:GUILD_ICOS[0],founder:USER,created:Date.now(),treasury:0,members:{[USER]:{role:'founder',joined:Date.now(),contrib:0}}};
+ try{await ref.set(doc)}catch(e){return{err:'Nepavyko sukurti gildijos.'}}
+ S.zen-=GUILD_COST;S.guild=ref.id;GUILD_CACHE[ref.id]=doc;save();return{ok:1,id:ref.id}}
+async function guildJoinAsync(id){
+ if(S.guild)return{err:'Jau esi gildijoje.'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const ref=fbDb.collection('guilds').doc(id),snap=await ref.get().catch(()=>null);
+ if(!snap||!snap.exists)return{err:'Gildija nerasta.'};
+ const g=snap.data();
+ if(Object.keys(g.members||{}).length>=30)return{err:'Gildija pilna.'};
+ try{await ref.update({['members.'+USER]:{role:'member',joined:Date.now(),contrib:0}})}catch(e){return{err:'Nepavyko prisijungti.'}}
+ S.guild=id;await refreshGuildCache(id);save();return{ok:1}}
+async function guildLeaveAsync(){
+ if(!S.guild)return{err:'Nesi gildijoje.'};
+ const id=S.guild,ref=fbDb.collection('guilds').doc(id);
+ if(fbOK){try{const snap=await ref.get();if(snap.exists){const g=snap.data(),rest=Object.keys(g.members||{}).filter(k=>k!==USER);
+   if(!rest.length)await ref.delete();
+   else{const upd={['members.'+USER]:firebase.firestore.FieldValue.delete()};if(g.founder===USER)upd.founder=rest[0];await ref.update(upd)}}}catch(e){}}
+ delete GUILD_CACHE[id];S.guild=null;save();return{ok:1}}
+async function guildDonateAsync(amt){amt=Math.floor(amt);
+ if(!S.guild)return{err:'Nesi gildijoje.'};
+ if(!amt||amt<1)return{err:'?'};if(amt>S.zen)return{err:'Neužtenka monetų.'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const ref=fbDb.collection('guilds').doc(S.guild);
+ try{await ref.update({treasury:firebase.firestore.FieldValue.increment(amt),['members.'+USER+'.contrib']:firebase.firestore.FieldValue.increment(amt)})}catch(e){return{err:'Nepavyko paaukoti.'}}
+ S.zen-=amt;await refreshGuildCache(S.guild);save();return{ok:1,amt,lvl:guildLevel(GUILD_CACHE[S.guild]||{treasury:0})}}
+async function guildDonateItemAsync(id){
+ if(!S.guild)return{err:'Nesi gildijoje.'};
+ const i=S.inv.findIndex(x=>x.id===id);if(i<0)return{err:'?'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const it=S.inv[i],val=Math.round(RAR[it.r].sell*(1+it.lv/10));
+ const ref=fbDb.collection('guilds').doc(S.guild);
+ try{await ref.update({treasury:firebase.firestore.FieldValue.increment(val),['members.'+USER+'.contrib']:firebase.firestore.FieldValue.increment(val)})}catch(e){return{err:'Nepavyko paaukoti.'}}
+ S.inv.splice(i,1);await refreshGuildCache(S.guild);save();return{ok:1,val,lvl:guildLevel(GUILD_CACHE[S.guild]||{treasury:0})}}
+async function friendAddAsync(name){const uk=(name||'').trim().toLowerCase();
+ if(!uk)return{err:'?'};if(uk===USER)return{err:'Tai tu pats.'};
+ if(!S.friends)S.friends=[];if(S.friends.includes(uk))return{err:'Jau draugas.'};
+ if(S.friends.length>=30)return{err:'Draugų sąrašas pilnas.'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const snap=await fbDb.collection('usernames').doc(uk).get().catch(()=>null);
+ if(!snap||!snap.exists)return{err:'Tokio vartotojo nėra.'};
+ S.friends.push(uk);save();return{ok:1}}
+async function raidFriendAsync(uk){const now=Date.now();const chk=Server.ready(S,now);if(chk)return{err:chk};
+ uk=(uk||'').toLowerCase();if(!uk||uk===USER)return{err:'Negali užpulti savęs.'};
+ if(!S.raidCd)S.raidCd={};const last=S.raidCd[uk]||0;
+ if(now-last<RAID_CD)return{err:'Palauk '+Math.ceil((RAID_CD-(now-last))/3600000)+' val. prieš puldamas šį žaidėją vėl.'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const snap=await fbDb.collection('saves').doc(uk).get().catch(()=>null);
+ if(!snap||!snap.exists)return{err:'Šis žaidėjas nerastas.'};
+ let raw;try{raw=JSON.parse(snap.data().json)}catch(e){raw=null}
+ if(!raw)return{err:'Šis žaidėjas nerastas.'};
+ const victim=migrate(raw);if(victim.profilePublic===false)return{err:'Žaidėjas paslėpė savo profilį.'};
+ if(victim.lvl<RAID_MIN_LVL)return{err:'Žaidėjas per žemo lygio užpuolimui (min. '+RAID_MIN_LVL+' lyg.).'};
+ regen(S);ensureToday(S);const P=stats(S),V=stats(victim),php0=S.hp;
+ const sim=simulate(P,{hp:V.hp,atk:V.atk,def:V.def,spd:V.spd,crit:V.crit,elem:V.elem,name:victim.name,boss:false},S.hp,activeProcs(S));
+ Server.after(S,P,sim,now);S.raidCd[uk]=now;
+ const res={raid:true,zi:0,win:sim.win,rounds:sim.rounds,log:sim.log,e:{name:victim.name,hp:V.hp,boss:false,race:victim.race},pmax:P.hp,pstart:php0,xp:0,zen:0,item:null,lvlUp:0,stolen:0,broke:null};
+ if(sim.win){const steal=Math.min(Math.round(victim.zen*RAID_STEAL_PCT),RAID_STEAL_MAX);
+  victim.zen=Math.max(0,victim.zen-steal);S.zen+=steal;res.stolen=steal;res.zen=steal;
+  const slots=Object.keys(victim.equip||{}).filter(s=>victim.equip[s]);
+  if(slots.length){const slot=pick(slots),it=victim.equip[slot];it.up=Math.max(0,(it.up||0)-1);
+   if(Math.random()<RAID_BREAK_CHANCE){delete victim.equip[slot];res.broke={slot,name:it.name,broken:true}}
+   else res.broke={slot,name:it.name,broken:false}}
+  res.xp=Math.round(10*Math.pow(victim.lvl,1.2)*xpM(S,now));res.lvlUp=gainXp(S,res.xp);
+  try{await fbDb.collection('saves').doc(uk).set({json:JSON.stringify(victim),savedAt:Date.now(),name:victim.name,lvl:victim.lvl})}catch(e){}
+  PROFILE_CACHE[uk]=undefined}
+ save();return res}
 let USER=null;try{USER=localStorage.getItem(USER_KEY)||null}catch(e){}
 function simpleHash(s){let h=0;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0}return'sh'+(h>>>0).toString(16)}
 async function pwHash(s){try{const h=await sha(s);return h||simpleHash(s)}catch(e){return simpleHash(s)}}
-function save(){if(!USER)return;try{localStorage.setItem(userSaveKey(USER),JSON.stringify(S))}catch(e){}}
+const syncKey=u=>'zk_sync_'+u;
+let cloudSaveTimer=null;
+function pushCloudSave(){if(!fbOK||!USER||!S)return;
+ const uk=USER,ts=Date.now();
+ fbDb.collection('saves').doc(uk).set({json:JSON.stringify(S),savedAt:ts,name:S.name,lvl:S.lvl}).then(()=>{
+  try{localStorage.setItem(syncKey(uk),String(ts))}catch(e){}
+ }).catch(e=>console.warn('cloud save failed',e))}
+function pullCloudSave(uk){if(!fbOK)return Promise.resolve();
+ return fbDb.collection('saves').doc(uk).get().then(snap=>{
+  if(!snap.exists)return;
+  const cloud=snap.data();if(!cloud||!cloud.json)return;
+  let localTs=0;try{localTs=+(localStorage.getItem(syncKey(uk))||0)}catch(e){}
+  const cloudTs=cloud.savedAt||0;
+  if(!localTs||cloudTs>localTs){try{localStorage.setItem(userSaveKey(uk),cloud.json);localStorage.setItem(syncKey(uk),String(cloudTs))}catch(e){}}
+ }).catch(e=>console.warn('cloud pull failed',e))}
+function save(){if(!USER)return;try{localStorage.setItem(userSaveKey(USER),JSON.stringify(S))}catch(e){}
+ if(fbOK){clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(pushCloudSave,1500)}}
 function load(){if(!USER)return null;try{const j=JSON.parse(localStorage.getItem(userSaveKey(USER)));if(j&&RACES[j.race]&&typeof j.lvl==='number')return migrate(j)}catch(e){}return null}
 /*==UI==*/
 const $=s=>document.querySelector(s);
@@ -1163,24 +1247,24 @@ function statsCard(){const total=S.wins+S.losses,wr=total?Math.round(S.wins/tota
  const rows=[['⏱️ Žaidimo laikas',playtimeStr(Date.now()-S.created)],['⚔️ Kovų iš viso',fmt(total)+' ('+wr+'% pergalių)'],['👑 Nugalėti bosai',fmt(S.bosses)],['🏟️ Arenos kovų',fmt(atotal)+' ('+awr+'% pergalių)'],['💎 Surinkti rinkiniai',fmt(S.sets)],['🟨 Rasti legendiniai',fmt(S.legends)],['🐾 Palydovų',S.comp.owned.length+'/'+COMPANIONS.length],['🎖️ Pasiekimų',Object.keys(S.ach).length+'/'+ACH.length],['📅 Dovanų serija',fmt(S.daily.streak)+' d.'],['🔁 Veiksmų',fmt(S.actions)]];
  return`<div class="card"><h2>📊 Statistika</h2>${rows.map(([l,v])=>`<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="mut">${l}</span><b>${v}</b></div>`).join('')}</div>`}
 function guildCard(){
- if(S.guild){const gs=guildLoad(),g=gs[S.guild];
-  if(!g){S.guild=null;return guildCard()}
-  const lvl=guildLevel(g),bonus=Math.round(guildBonus(S)*100);
-  const members=g.members.slice().sort((a,b)=>(b.contrib||0)-(a.contrib||0)).map(m=>{const lite=readUserLite(m.id,USER),nm=lite?lite.name:m.id;
-   return`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${esc(nm)}</b>${m.id===g.founder?' <span class="tag gold">👑 Įkūrėjas</span>':''}${m.id===USER?' <span class="tag ok">Tu</span>':''}${lite&&!lite.hidden?` <span class="mut">· lyg. ${lite.lvl} · ⚡${fmt(lite.power)}</span>`:lite&&lite.hidden?' <span class="mut">· 🔒 paslėptas</span>':''}</div><span class="mut">${fmt(m.contrib||0)} 🪙</span></div>`}).join('');
+ if(S.guild){const g=GUILD_CACHE[S.guild];
+  if(!g)return`<div class="card"><h2>🏰 Gildija</h2><p class="mut">⏳ Kraunama...</p></div>`;
+  const lvl=guildLevel(g),bonus=Math.round(guildBonus(S)*100),mkeys=Object.keys(g.members||{});
+  const members=mkeys.map(uk=>({uk,...g.members[uk]})).sort((a,b)=>(b.contrib||0)-(a.contrib||0)).map(m=>{const lite=readUserLite(m.uk,USER),nm=lite?lite.name:m.uk;
+   return`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${esc(nm)}</b>${m.uk===g.founder?' <span class="tag gold">👑 Įkūrėjas</span>':''}${m.uk===USER?' <span class="tag ok">Tu</span>':''}${lite&&!lite.hidden?` <span class="mut">· lyg. ${lite.lvl} · ⚡${fmt(lite.power)}</span>`:lite&&lite.hidden?' <span class="mut">· 🔒 paslėptas</span>':''}</div><span class="mut">${fmt(m.contrib||0)} 🪙</span></div>`}).join('');
   const invRows=S.inv.slice(0,12).map(it=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)">${itemArt(it)}<div style="flex:1;min-width:0">${itemLine(it)}</div><button class="sm" data-act="guilddonateitem" data-arg="${it.id}">💰 ${fmt(Math.round(RAR[it.r].sell*(1+it.lv/10)))}</button></div>`).join('');
   return`<div class="card"><div class="row"><h2 style="margin:0">${g.ico} ${esc(g.name)}</h2><span class="tag gold">Pastato lyg. ${lvl}</span></div>
-  <p class="mut" style="margin:6px 0">${g.members.length}/30 narių · Iždas: ${fmt(g.treasury||0)} 🪙 · Bonusas visiems nariams: +${bonus}% monetų ir patirties iš kovų</p>
+  <p class="mut" style="margin:6px 0">${mkeys.length}/30 narių · Iždas: ${fmt(g.treasury||0)} 🪙 · Bonusas visiems nariams: +${bonus}% monetų ir patirties iš kovų</p>
   ${members}
   <div class="row" style="margin-top:10px;gap:6px"><input id="gdon" type="number" min="1" placeholder="Suma" style="flex:1"><button class="sm pri" data-act="guilddonate">💰 Aukoti monetų</button></div>
   <p class="mut" style="margin:10px 0 4px"><b>Aukoti daiktą iš kuprinės (kelia pastato lygį):</b></p>
   ${invRows||'<p class="mut">Kuprinė tuščia.</p>'}
   <button data-act="guildleave" style="margin-top:8px;color:var(--bad)">🚪 Palikti gildiją</button></div>`}
- const gs=guildLoad(),list=Object.values(gs).sort((a,b)=>b.members.length-a.members.length).slice(0,8);
- const rows=list.map(g=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${g.ico} ${esc(g.name)}</b><div class="mut">${g.members.length}/30 narių · Lyg. ${guildLevel(g)}</div></div><button class="sm" data-act="guildjoin" data-arg="${g.id}">Įsijungti</button></div>`).join('');
+ const list=GUILD_LIST_CACHE;
+ const rows=(list||[]).map(g=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${g.ico} ${esc(g.name)}</b><div class="mut">${Object.keys(g.members||{}).length}/30 narių · Lyg. ${guildLevel(g)}</div></div><button class="sm" data-act="guildjoin" data-arg="${g.id}">Įsijungti</button></div>`).join('');
  const icos=GUILD_ICOS.map(i=>`<button class="sm${ui.gico===i?' pri':''}" data-act="gico" data-arg="${i}">${i}</button>`).join('');
  return`<div class="card"><h2>🏰 Gildija</h2><p class="mut" style="margin-top:0">Jungkis prie gildijos arba sukurk savo (${GUILD_COST} 🪙). Nariai aukoja monetų ir daiktų į iždą — kuo didesnis iždas, tuo didesnis pastato lygis ir bonusas visiems nariams (monetos ir patirtis).</p>
- ${list.length?`<p class="mut" style="margin:6px 0 4px"><b>Esamos gildijos:</b></p>${rows}`:'<p class="mut">Gildijų kol kas nėra — būk pirmas!</p>'}
+ ${list===null?'<p class="mut">⏳ Kraunama...</p>':list.length?`<p class="mut" style="margin:6px 0 4px"><b>Esamos gildijos:</b></p>${rows}`:'<p class="mut">Gildijų kol kas nėra — būk pirmas!</p>'}
  <div style="margin-top:10px"><input id="gname" placeholder="Naujos gildijos pavadinimas" maxlength="20"><div style="margin:6px 0;display:flex;flex-wrap:wrap;gap:4px">${icos}</div><button class="pri" data-act="guildcreate" ${GUILD_COST>S.zen?'disabled':''}>🏰 Sukurti (${GUILD_COST} 🪙)</button></div></div>`}
 function friendProfileCard(uk){const lite=readUserLite(uk,USER);
  if(!lite)return`<div class="card"><p class="mut">Šis žaidėjas nerastas šiame įrenginyje.</p><button data-act="viewfriend" data-arg="">← Atgal</button></div>`;
@@ -1248,10 +1332,10 @@ function tabAuth(){const mode=ui.authMode||'login',isLogin=mode==='login';
  <input id="ap" type="password" maxlength="40" placeholder="Slaptažodis" style="margin-top:8px" autocomplete="${isLogin?'current-password':'new-password'}">
  ${isLogin?'':`<input id="ap2" type="password" maxlength="40" placeholder="Pakartok slaptažodį" style="margin-top:8px" autocomplete="new-password">`}
  <button class="pri" style="margin-top:10px;width:100%" data-act="${isLogin?'authlogin':'authregister'}">${isLogin?'🔑 Prisijungti':'✨ Registruotis'}</button>
- <p class="mut" style="margin:10px 0 0">Jokio el. pašto nereikia — tik vardas ir slaptažodis. Duomenys saugomi šiame įrenginyje.</p>
+ <p class="mut" style="margin:10px 0 0">Jokio el. pašto nereikia — tik vardas ir slaptažodis (bent 6 simboliai). Paskyra ir pažanga saugoma serveryje — galėsi tęsti žaidimą iš bet kurio įrenginio.</p>
  </div>
  ${authFooter()}`}
-function authFooter(){return`<div class="card"><h2 style="margin-top:0">🍪 Slapukai</h2><p class="mut" style="margin:0">Naudojame tik būtinus naršyklės duomenis (localStorage) — tavo žaidimo pažangai ir prisijungimui saugoti šiame įrenginyje. Analitikos ar reklamos slapukų nėra.</p></div>
+function authFooter(){return`<div class="card"><h2 style="margin-top:0">🍪 Slapukai</h2><p class="mut" style="margin:0">Naudojame tik būtinus naršyklės duomenis — tavo paskyra ir žaidimo pažanga saugoma serveryje (Firebase), o vietinė kopija (localStorage) leidžia žaisti greičiau ir be ryšio. Analitikos ar reklamos slapukų nėra.</p></div>
  <div class="card"><h2 style="margin-top:0">⭐ Rekomendacijos</h2><p class="mut" style="margin:0">Pasirink rasę pagal norimą stilių (gynyba, puolimas ar greitis), kasdien atsiimk dienos dovaną ir savaitės iššūkį, nepamiršk požemio raktų ir bosų maratono — taip progresuosi greičiausiai.</p></div>
  <div class="card"><h2 style="margin-top:0">📞 Kontaktai</h2><p class="mut" style="margin:0 0 6px">Klausimai, pasiūlymai ar pastebėjai klaidą? Rašyk:</p><p style="margin:0">✉️ <a href="mailto:seriofa1991@gmail.com" style="color:var(--acc)">seriofa1991@gmail.com</a></p><p style="margin:4px 0 0">💬 Telegram: <a href="https://t.me/SergejK0" target="_blank" rel="noopener" style="color:var(--acc)">@SergejK0</a></p></div>
  <p class="mut" style="text-align:center;margin:12px 0">⭐ Žvaigždžių Kovotojai — nepriklausomas projektas, kurtas vieno kūrėjo.</p>`}
@@ -1399,34 +1483,60 @@ function act(a,arg,btn){
  if(a==='authregister'){const u=($('#au').value||'').trim(),p=($('#ap').value||''),p2=($('#ap2')?$('#ap2').value:'');
   ui.authUser=u;
   if(!/^[A-Za-z0-9_]{2,16}$/.test(u)){toast('Vardas: 2-16 raidžių/skaičių/_ be tarpų.');Snd.play('err');return}
-  if(p.length<4){toast('Slaptažodis turi būti bent 4 simbolių.');Snd.play('err');return}
+  if(p.length<6){toast('Slaptažodis turi būti bent 6 simbolių.');Snd.play('err');return}
   if(p!==p2){toast('Slaptažodžiai nesutampa.');Snd.play('err');return}
-  const uk=u.toLowerCase(),accs=accLoad();
-  if(accs[uk]){toast('Toks vartotojo vardas jau užimtas.');Snd.play('err');return}
-  pwHash(p).then(hash=>{const accs2=accLoad();if(accs2[uk]){toast('Toks vartotojo vardas jau užimtas.');Snd.play('err');return}
-   accs2[uk]={pass:hash,created:Date.now(),name:u};accSave(accs2);
-   if(Object.keys(accs2).length===1){try{const legacy=localStorage.getItem('zk_v1');if(legacy)localStorage.setItem(userSaveKey(uk),legacy)}catch(e){}}
+  if(!fbOK){toast('Nėra ryšio su serveriu. Patikrink interneto ryšį.');Snd.play('err');return}
+  const uk=u.toLowerCase();
+  toast('⏳ Kuriama paskyra...');
+  fbDb.collection('usernames').doc(uk).get().then(snap=>{
+   if(snap.exists)throw{code:'zk/taken'};
+   return fbAuth.createUserWithEmailAndPassword(emailFor(uk),p);
+  }).then(cred=>fbDb.collection('usernames').doc(uk).set({uid:cred.user.uid,name:u,created:Date.now()}).catch(()=>{
+    return cred.user.delete().catch(()=>{}).then(()=>{throw{code:'zk/taken'}});
+   })
+  ).then(()=>{
    USER=uk;try{localStorage.setItem(USER_KEY,USER)}catch(e){}
-   S=load();ui.tab='kova';render();toast('👋 Sveikas, '+u+'!');Snd.play('lvl')});
+   return pullCloudSave(uk);
+  }).then(()=>{S=load();ui.tab='kova';render();toast('👋 Sveikas, '+u+'!');Snd.play('lvl')})
+  .catch(err=>{toast(err&&err.code==='zk/taken'?'Toks vartotojo vardas jau užimtas.':authErr(err));Snd.play('err')});
   return}
  if(a==='authlogin'){const u=($('#au').value||'').trim(),p=($('#ap').value||'');ui.authUser=u;
   const uk=u.toLowerCase();if(!uk||!p){toast('Įvesk vardą ir slaptažodį.');Snd.play('err');return}
-  const accs=accLoad(),acc=accs[uk];if(!acc){toast('Tokio vartotojo nėra.');Snd.play('err');return}
-  pwHash(p).then(hash=>{if(hash!==acc.pass){toast('Neteisingas slaptažodis.');Snd.play('err');return}
-   USER=uk;try{localStorage.setItem(USER_KEY,USER)}catch(e){}
-   S=load();ui.tab='kova';render();toast('👋 Sveikas sugrįžęs, '+(acc.name||u)+'!');Snd.play('lvl')});
+  if(!fbOK){toast('Nėra ryšio su serveriu. Patikrink interneto ryšį.');Snd.play('err');return}
+  toast('⏳ Jungiamasi...');
+  fbAuth.signInWithEmailAndPassword(emailFor(uk),p).then(()=>uk).catch(err=>{
+   const code=err&&err.code;
+   if(code==='auth/user-not-found'||code==='auth/invalid-credential'||code==='auth/wrong-password'){
+    const accs=accLoad(),acc=accs[uk];
+    if(!acc)throw err;
+    return pwHash(p).then(hash=>{
+     if(hash!==acc.pass)throw err;
+     return fbDb.collection('usernames').doc(uk).get().then(snap=>{
+      if(snap.exists)throw err;
+      return fbAuth.createUserWithEmailAndPassword(emailFor(uk),p).then(cred=>
+       fbDb.collection('usernames').doc(uk).set({uid:cred.user.uid,name:acc.name||u,created:acc.created||Date.now()}));
+     }).then(()=>uk);
+    });
+   }
+   throw err;
+  }).then(uk2=>{
+   USER=uk2;try{localStorage.setItem(USER_KEY,USER)}catch(e){}
+   return pullCloudSave(uk2);
+  }).then(()=>{S=load();if(S&&S.guild)refreshGuildCache(S.guild);ui.tab='kova';render();toast('👋 Sveikas sugrįžęs, '+u+'!');Snd.play('lvl')})
+  .catch(err=>{toast(authErr(err));Snd.play('err')});
   return}
- if(a==='logout'){USER=null;try{localStorage.removeItem(USER_KEY)}catch(e){}S=null;ui.tab='kova';render();return}
+ if(a==='logout'){if(fbOK)fbAuth.signOut().catch(()=>{});USER=null;try{localStorage.removeItem(USER_KEY)}catch(e){}S=null;ui.tab='kova';
+  for(const k in PROFILE_CACHE)delete PROFILE_CACHE[k];GUILD_CACHE={};GUILD_LIST_CACHE=null;render();return}
  if(a==='guidedone'){S.tutSeen=true;ui.forceGuide=false;save();render();return}
  if(a==='guideopen'){ui.forceGuide=true;ui.tab='kova';render();return}
  if(a==='gico'){ui.gico=arg;render();return}
- if(a==='guildcreate'){const n=($('#gname')||{}).value;const r=Server.guildCreate(S,n,ui.gico||GUILD_ICOS[0]);if(r.err){toast(r.err);Snd.play('err');return}toast('🏰 Gildija sukurta!');Snd.play('lvl');save();render();return}
- if(a==='guildjoin'){const r=Server.guildJoin(S,arg);if(r.err){toast(r.err);Snd.play('err');return}toast('🏰 Prisijungėte prie gildijos!');Snd.play('lvl');save();render();return}
- if(a==='guildleave'){const r=Server.guildLeave(S);if(r.err){toast(r.err);Snd.play('err');return}toast('🚪 Palikai gildiją.');save();render();return}
- if(a==='guilddonate'){const v=parseInt((($('#gdon')||{}).value)||'0',10);const r=Server.guildDonate(S,v);if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Paaukota '+fmt(r.amt)+' 🪙 (pastato lyg. '+r.lvl+')');Snd.play('coin');save();render();return}
- if(a==='guilddonateitem'){const r=Server.guildDonateItem(S,+arg);if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Daiktas paaukotas (+'+fmt(r.val)+' 🪙 į iždą, pastato lyg. '+r.lvl+')');Snd.play('coin');save();render();return}
+ if(a==='guildcreate'){const n=($('#gname')||{}).value;toast('⏳ Kuriama...');guildCreateAsync(n,ui.gico||GUILD_ICOS[0]).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🏰 Gildija sukurta!');Snd.play('lvl');render()});return}
+ if(a==='guildjoin'){toast('⏳ Jungiamasi...');guildJoinAsync(arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🏰 Prisijungėte prie gildijos!');Snd.play('lvl');render()});return}
+ if(a==='guildleave'){guildLeaveAsync().then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🚪 Palikai gildiją.');render()});return}
+ if(a==='guilddonate'){const v=parseInt((($('#gdon')||{}).value)||'0',10);guildDonateAsync(v).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Paaukota '+fmt(r.amt)+' 🪙 (pastato lyg. '+r.lvl+')');Snd.play('coin');render()});return}
+ if(a==='guilddonateitem'){guildDonateItemAsync(+arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Daiktas paaukotas (+'+fmt(r.val)+' 🪙 į iždą, pastato lyg. '+r.lvl+')');Snd.play('coin');render()});return}
  if(a==='togglepublic'){const r=Server.togglePublic(S);toast(r.pub?'👁️ Profilis vieša':'🔒 Profilis paslėptas');save();render();return}
- if(a==='friendadd'){const n=($('#fname')||{}).value;const r=Server.friendAdd(S,n);if(r.err){toast(r.err);Snd.play('err');return}toast('🤝 Draugas pridėtas');save();render();return}
+ if(a==='friendadd'){const n=($('#fname')||{}).value;toast('⏳ Tikrinama...');friendAddAsync(n).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🤝 Draugas pridėtas');render()});return}
  if(a==='friendremove'){Server.friendRemove(S,arg);save();render();return}
  if(a==='viewfriend'){ui.viewFriend=arg||null;render();return}
  if(a==='useskill'){const r=Server.useActiveSkill(S);if(r.err){toast(r.err);Snd.play('err');return}toast('⚡ Įgūdis paruoštas kitai kovai!');Snd.play('lvl');save();render();return}
@@ -1434,7 +1544,7 @@ function act(a,arg,btn){
  if(a==='bossback'){ui.bossScreen=false;render();scrollTo(0,0);return}
  if(a==='race'){const n=$('#nm');if(n)ui.name=n.value;ui.race=arg;render();return}
  if(a==='create'){const n=($('#nm').value||'').trim();if(n.length<2){toast('Įvesk vardą (bent 2 raidės).');Snd.play('err');return}S=newState(n,ui.race);S.tutSeen=false;S.hp=stats(S).hp;save();ui.tab='kova';ui.zone=0;render();Snd.play('lvl');return}
- if(a==='tab'){ui.tab=arg;ui.bossScreen=false;render();scrollTo(0,0);return}
+ if(a==='tab'){ui.tab=arg;ui.bossScreen=false;if(arg==='guild'){if(S.guild)refreshGuildCache(S.guild);else refreshGuildList()}render();scrollTo(0,0);return}
  if(a==='alogin'){const v=($('#apw').value||'');sha(v).then(h=>{if(h===null){toast('Admin veikia tik per https://');return}if(h===ADMIN_HASH){ui.admin=true;try{sessionStorage.setItem('zk_admin','1')}catch(e){}toast('Prisijungta');render()}else{toast('Neteisingas slaptažodis');Snd.play('err')}});return}
  if(a==='alogout'){ui.admin=false;try{sessionStorage.removeItem('zk_admin')}catch(e){}ui.tab=S?'prof':'kova';render();return}
  if(a==='asave'||a==='aimg'||a==='aexp'||a==='aimp'||a==='adef'){if(!ui.admin)return;adminCfg(a);render();return}
@@ -1451,7 +1561,7 @@ function act(a,arg,btn){
  else if(a==='opendungeon'){const r=Server.openDungeon(S);if(r.err){toast(r.err);Snd.play('err');return}toast('🚪 Požemis atidarytas 5 min.!');Snd.play('crystal')}
  else if(a==='dungeonfight'){if(busy)return;const r=Server.fightDungeon(S);if(r.err){toast(r.err);Snd.play('err');return}save();playBattle(r);afterAction(prev);save();return}
  else if(a==='fightwb'){if(busy)return;const r=Server.fightWBoss(S);if(r.err){toast(r.err);Snd.play('err');return}r.zi=ZONES.length-1;save();playBattle(r);afterAction(prev);save();return}
- else if(a==='raidfriend'){if(busy)return;const r=Server.raidFriend(S,arg);if(r.err){toast(r.err);Snd.play('err');return}save();playBattle(r);afterAction(prev);save();return}
+ else if(a==='raidfriend'){if(busy)return;toast('⏳ Puolama...');raidFriendAsync(arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}playBattle(r);afterAction(prev);save()}).catch(()=>{toast('Nepavyko užpulti.');Snd.play('err')});return}
  else if(a==='claimmission'){const r=Server.claimMission(S);if(r.err){toast(r.err);Snd.play('err');return}toast('📜 Misija įvykdyta: +'+fmt(r.m.zen)+' 🪙');Snd.play('lvl');if(btn)FX.at(btn,'#6c8cff',24)}
  else if(a==='claimtour'){const r=Server.claimTour(S);if(r.err){toast(r.err);Snd.play('err');return}toast('🏆 '+r.t.n+': +'+fmt(r.t.zen)+' 🪙');Snd.play('lvl');if(btn)FX.at(btn,'#ffb02e',26)}
  else if(a==='train'){const[k,t]=arg.split(':'),r=Server.train(S,k,+t);if(r.err){toast(r.err);return}Snd.play('coin')}
@@ -1544,7 +1654,7 @@ document.addEventListener('input',e=>{if(e.target.id==='nm')ui.name=e.target.val
 document.addEventListener('change',e=>{if(e.target.id==='vol')Snd.play('coin')});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='apw')act('alogin')});
 setInterval(tick,250);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();else if(fbOK&&USER&&S){clearTimeout(cloudSaveTimer);pushCloudSave()}});
 if('serviceWorker' in navigator && (location.protocol==='http:'||location.protocol==='https:')){
  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
 function welcomeBack(){if(!S)return;hofUpdate(S);const gap=Date.now()-(S.lastSeen||Date.now());S.lastSeen=Date.now();
@@ -1570,6 +1680,16 @@ function welcomeBack(){if(!S)return;hofUpdate(S);const gap=Date.now()-(S.lastSee
 accessApply();
 welcomeBack();
 render();
+function firebaseBootstrap(){if(!fbOK)return;
+ fbAuth.onAuthStateChanged(user=>{
+  if(user&&USER){
+   let before=0;try{before=+(localStorage.getItem(syncKey(USER))||0)}catch(e){}
+   pullCloudSave(USER).then(()=>{let after=0;try{after=+(localStorage.getItem(syncKey(USER))||0)}catch(e){}
+    if(after>before){const fresh=load();if(fresh){S=fresh;render()}}
+    if(S&&S.guild)refreshGuildCache(S.guild)})
+  }
+ })}
+firebaseBootstrap();
 </script>
 </body>
 </html>
