@@ -60,6 +60,14 @@ details summary{cursor:pointer;padding:4px 0}
 .flip{transform:scaleX(-1)}
 .thumb{width:56px;height:68px;flex:none}
 .ithumb{width:44px;height:44px;flex:none}img.ithumb{object-fit:contain;background:#0b0f20;border-radius:10px;border:1px solid var(--line)}
+.eqwrap{position:relative;height:184px;width:160px;margin:4px auto 44px}
+.eqslot{position:absolute;width:0;height:0;padding:0;margin:0;min-height:0;width:54px;height:54px;border-radius:50%;background:var(--card2);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.eqslot.filled{border-color:var(--gold);box-shadow:0 0 0 2px #ffb02e33}
+.eqslot .ithumb{width:36px;height:36px;border:0;background:none}
+.eqslot .lbl{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--mut);white-space:nowrap}
+.eqdetail{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;animation:in .2s}
+.statrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.statrow:last-of-type{border-bottom:0}
 .zonebn{height:120px;border-radius:16px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px;position:relative}
 .zonebn .lbl{position:absolute;left:12px;bottom:8px;font-weight:800;font-size:18px;text-shadow:0 2px 8px #000}
 .zonebn .lbl small{display:block;font-weight:500;font-size:12px;opacity:.85}
@@ -674,6 +682,9 @@ const Server={
    try{localStorage.setItem(userSaveKey(uk),JSON.stringify(victim))}catch(e){}}
   return res},
  equip(p,id){const i=p.inv.findIndex(x=>x.id===id);if(i<0)return;const it=p.inv.splice(i,1)[0],old=p.equip[it.slot];if(old)p.inv.push(old);p.equip[it.slot]=it},
+ unequip(p,slotKey){const it=p.equip[slotKey];if(!it)return{err:'?'};p.equip[slotKey]=null;
+  if(p.inv.length>=invCap(p)){const z=Math.round(RAR[it.r].sell*(1+it.lv/10)*sellM(p));p.zen+=z;return{ok:1,sold:z}}
+  p.inv.push(it);return{ok:1}},
  sell(p,id){const i=p.inv.findIndex(x=>x.id===id);if(i<0)return 0;const it=p.inv.splice(i,1)[0],z=Math.round(RAR[it.r].sell*(1+it.lv/10)*sellM(p));p.zen+=z;ensureToday(p);p.today.sell++;return z},
  sellJunk(p){let t=0;for(const it of p.inv.slice())if(it.r===0)t+=Server.sell(p,it.id);return t},
  sellFiltered(p,filt){let t=0;for(const it of p.inv.slice())if(filt==='all'||it.r===+filt)t+=Server.sell(p,it.id);return t},
@@ -886,6 +897,28 @@ const mins=t=>Math.ceil((t-Date.now())/60000)+' min';
 const chanceTag=c=>`<b class="${c>=75?'ok':c>=40?'gold':'bad'}">${c}%</b>`;
 const itemLine=i=>i?`<span style="color:${RAR[i.r].c}">${esc(i.name)}</span>${i.up?` <b class="gold">+${i.up}</b>`:''} <span class="mut">${i.atk?'+'+i.atk+' puol. ':''}${i.def?'+'+i.def+' gyn. ':''}${i.hp?'+'+i.hp+' gyv.':''}</span>${i.elem?` <span class="tag">${ELEMENTS.find(x=>x.id===i.elem).ico} ${ELEMENTS.find(x=>x.id===i.elem).n}</span>`:''}${i.proc?`<div class="gold" style="font-size:12px">${LEG_PROCS.find(x=>x.id===i.proc).ico} ${esc(LEG_PROCS.find(x=>x.id===i.proc).n)}</div>`:''}`:'<span class="mut">— tuščia —</span>';
 const eqRow=(it,slotKey)=>`<div class="row2" style="padding:6px 0">${it?itemArt(it):`<div class="ithumb mut" style="display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:10px;font-size:18px">${SLOTS[slotKey].ico}</div>`}<div style="flex:1;min-width:0">${itemLine(it)}</div></div>`;
+function equipBonus(p){let atk=0,def=0,hp=0,spd=0;
+ for(const s in p.equip){const it=p.equip[s];if(!it)continue;const m=(1+.1*(it.up||0))*(1+.06*(it.ench||0))*(it.awakened?1.2:1);
+  atk+=it.atk*m;def+=it.def*m;hp+=it.hp*m;
+  if(it.sockets)for(const rn of it.sockets)if(rn){if(rn.k==='atk')atk+=rn.val;else if(rn.k==='def')def+=rn.val;else if(rn.k==='hp')hp+=rn.val;else if(rn.k==='spd')spd+=rn.val}}
+ return{atk:Math.round(atk),def:Math.round(def),hp:Math.round(hp),spd:Math.round(spd)}}
+const SLOT_POS={weapon:'left:-6px;bottom:6px',armor:'right:-6px;bottom:6px',charm:'left:50%;top:-6px;transform:translateX(-50%)'};
+function equipRadial(){const btns=Object.keys(SLOTS).map(s=>{const it=S.equip[s];
+  return`<button class="eqslot${it?' filled':''}" data-act="eqview" data-arg="${s}" style="${SLOT_POS[s]||''}">${it?itemArt(it):`<span style="font-size:20px;opacity:.6">${SLOTS[s].ico}</span>`}<span class="lbl">${SLOTS[s].n}</span></button>`}).join('');
+ return`<div class="eqwrap">${fighterArt(S.race)}${btns}</div>`}
+function eqDetailOverlay(){if(!ui.eqView)return'';const slotKey=ui.eqView,it=S.equip[slotKey];
+ if(!it)return`<div class="ov"><div class="eqdetail"><h2>${SLOTS[slotKey].ico} ${SLOTS[slotKey].n}</h2><p class="mut" style="margin:0 0 14px">Lizdas tuščias. Apsirenk tinkamą daiktą iš kuprinės žemiau.</p><button class="pri" data-act="eqclose">Uždaryti</button></div></div>`;
+ const rows=[['⚔️ Puolimas',it.atk],['🛡️ Gynyba',it.def],['❤️ Gyvybės',it.hp]].filter(r=>r[1]).map(([n,v])=>`<div class="statrow"><span>${n}</span><b>+${fmt(v)}</b></div>`).join('');
+ return`<div class="ov"><div class="eqdetail">
+  <div class="row2" style="margin-bottom:10px">${itemArt(it)}<div style="flex:1;min-width:0"><h2 style="margin:0"><span style="color:${RAR[it.r].c}">${esc(it.name)}</span></h2><span class="tag" style="color:${RAR[it.r].c}">${RAR[it.r].n}</span>${it.up?' <span class="tag gold">+'+it.up+'</span>':''}${it.awakened?' <span class="tag gold">🌟</span>':''}</div></div>
+  <p class="mut" style="margin:0 0 6px">${SLOTS[slotKey].n}, lygis ${it.lv}</p>
+  ${rows}
+  ${it.elem?`<p class="mut" style="margin:8px 0 0">${ELEMENTS.find(x=>x.id===it.elem).ico} Stichija: ${ELEMENTS.find(x=>x.id===it.elem).n}</p>`:''}
+  ${it.proc?`<p class="gold" style="margin:8px 0 0;font-size:13px">${LEG_PROCS.find(x=>x.id===it.proc).ico} ${esc(LEG_PROCS.find(x=>x.id===it.proc).n)}</p>`:''}
+  ${it.ench?`<p class="mut" style="margin:4px 0 0">✨ Įkalimas: lyg. ${it.ench}</p>`:''}
+  ${it.sockets&&it.sockets.length?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${socketsHtml(it,slotKey)}</div>`:''}
+  <div class="row" style="margin-top:14px;gap:8px"><button data-act="uneq" data-arg="${slotKey}" style="color:var(--bad)">✕ Nusiimti</button><button class="pri" data-act="eqclose">Uždaryti</button></div>
+  </div></div>`}
 const banner=()=>CFG.announce?`<div class="banner">📢 ${esc(CFG.announce)}</div>`:'';
 function topZone(){for(let i=ZONES.length-1;i>=0;i--)if(S.lvl>=ZONES[i].lvl)return i;return 0}
 
@@ -998,19 +1031,28 @@ function runePouch(){const runes=S.runes||[];const eq=Object.keys(SLOTS).filter(
 function forgeSection(){const rows=Object.keys(SLOTS).map(forgeRow).filter(Boolean).join('');
  const sb=setBonus(S),setInfo=sb.n?`<p class="ok" style="margin:8px 0 0">✨ Rinkinys „${esc(sb.pre)}“ (${sb.n}/3): +${Math.round(sb.mul*100)}% visoms savybėms</p>`:`<p class="mut" style="margin:8px 0 0">Surink 2-3 to paties priešdėlio (pvz. „Žaibo“) daiktus vienu metu, kad gautum rinkinio bonusą.</p>`;
  return rows?`<div class="card"><h2>⚒️ Kalvė</h2><p class="mut" style="margin-top:0">Tobulink (⚒️ +10% lygiui) arba perkalk (🎲 naujos atsitiktinės savybės, ta pati retumas ir tobulinimo lygis) apsirengtus daiktus.</p>${rows}${setInfo}</div>${runePouch()}`:''}
-function tabBag(){const st=stats(S),eq=Object.keys(SLOTS).map(s=>eqRow(S.equip[s]||null,s)).join('');
+function tabBag(){const st=stats(S),eb=equipBonus(S);
+ const freeSlots=Object.keys(SLOTS).filter(s=>!S.equip[s]).map(s=>SLOTS[s].n);
  const shop=Object.keys(SHOP).map(k=>{const s=SHOP[k],c=s.c(S.lvl);return`<div class="row2" style="padding:7px 0;border-bottom:1px solid var(--line)">${potionArt(k)}<div style="flex:1"><b>${s.n}</b><div class="mut">${s.d}</div></div><button class="sm" data-act="buy" data-arg="${k}" ${c>S.zen?'disabled':''}>${fmt(c)} 🪙</button></div>`}).join('');
- const filt=ui.bagFilter||'all',visInv=S.inv.filter(i=>filt==='all'||i.r===+filt).slice().sort((a,b)=>itemScore(b)-itemScore(a));
+ const filt=ui.bagFilter||'all',q=(ui.bagSearch||'').trim().toLowerCase();
+ const visInv=S.inv.filter(i=>(filt==='all'||i.r===+filt)&&(!q||i.name.toLowerCase().includes(q))).slice().sort((a,b)=>itemScore(b)-itemScore(a));
+ const totalVal=S.inv.reduce((a,i)=>a+Math.round(RAR[i.r].sell*(1+i.lv/10)*sellM(S)),0);
  const inv=visInv.map(i=>`<div class="card" style="padding:10px"><div class="row2">${itemArt(i)}<div style="flex:1;min-width:0">${itemLine(i)} <span class="tag" style="color:${RAR[i.r].c}">${RAR[i.r].n}</span></div></div><div class="row" style="margin-top:8px"><button class="sm" data-act="equip" data-arg="${i.id}">Apsirengti${S.equip[i.slot]?(itemScore(i)>itemScore(S.equip[i.slot])?' ⬆️':' ⬇️'):' ⬆️'}</button><button class="sm" data-act="sell" data-arg="${i.id}">Parduoti</button></div></div>`).join('');
  const filtBtns=[['all','Visi']].concat(RAR.map((r,i)=>[''+i,r.n])).map(([k,n])=>`<button class="sm ${filt===k?'sel':''}" data-act="bagfilter" data-arg="${k}">${n}</button>`).join('');
- return banner()+header()+`<div class="card"><h2>Apranga</h2>${eq}<div class="mut" style="margin-top:8px">⚔️ ${fmt(st.atk)} · 🛡️ ${fmt(st.def)} · ❤️ ${fmt(st.hp)} · ⚡ ${fmt(st.spd)} · 🎯 ${Math.round(st.crit*100)}% kritas</div></div>
+ return banner()+header()+`<div class="card"><h2>Apranga</h2>${equipRadial()}
+ <h2 style="margin-top:4px">👕 Įrangos priedai</h2>
+ <div class="grid g2" style="margin-bottom:6px"><div class="statrow"><span>⚔️ Puolimas</span><b class="gold">+${fmt(eb.atk)}</b></div><div class="statrow"><span>🛡️ Gynyba</span><b class="gold">+${fmt(eb.def)}</b></div><div class="statrow"><span>❤️ Gyvybės</span><b class="gold">+${fmt(eb.hp)}</b></div><div class="statrow"><span>⚡ Greitis</span><b class="gold">+${fmt(eb.spd)}</b></div></div>
+ ${freeSlots.length?`<p class="mut" style="margin:4px 0 0">🔓 Laisvi lizdai: ${freeSlots.join(', ')}</p>`:''}
+ <p class="mut" style="margin:8px 0 0">Bendra galia su visais bonusais: ⚔️ ${fmt(st.atk)} · 🛡️ ${fmt(st.def)} · ❤️ ${fmt(st.hp)} · ⚡ ${fmt(st.spd)} · 🎯 ${Math.round(st.crit*100)}% kritas</p></div>
  ${forgeSection()}
  <div class="grid g2" style="margin-bottom:12px"><button data-act="heal">🩹 Gydytis</button><button data-act="junk">🧹 Parduoti paprastus</button></div>
  <div class="card"><h2>🏪 Parduotuvė</h2>${shop}</div>
- <h2>Kuprinė (${S.inv.length}/${invCap(S)})</h2>
+ <div class="row" style="margin-bottom:4px"><h2 style="margin:0">Kuprinė (${S.inv.length}/${invCap(S)})</h2><span class="mut">Vertė: ${fmt(totalVal)} 🪙</span></div>
+ <input id="bagq" placeholder="🔍 Ieškoti daikto..." value="${esc(ui.bagSearch||'')}" style="margin-bottom:8px">
  <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">${filtBtns}</div>
  ${filt!=='all'&&visInv.length?`<button class="sm" data-act="sellfilt" data-arg="${filt}" style="margin-bottom:10px">💰 Parduoti visus rodomus (${visInv.length})</button>`:''}
- ${inv||'<p class="mut">Tuščia pagal šį filtrą.</p>'}`}
+ ${inv||'<p class="mut">Tuščia pagal šį filtrą.</p>'}
+ ${eqDetailOverlay()}`}
 function tabArena(){const P=stats(S),opps=Server.arenaOpps(S),rows=leaderboard(S),me=rows.findIndex(r=>r.me),left=Math.max(0,Math.ceil(SEASON_DAYS-(Date.now()-S.created)/864e5));
  const o=opps.map(e=>`<button data-act="pvp" data-arg="${e.i}" class="fb"><div class="row2"><div class="thumb">${fighterArt(e.race,true)}</div><div style="flex:1;min-width:0"><div class="row"><b>${esc(e.name)}</b><span class="tag">${RACES[e.race].ico} lyg. ${e.L}</span></div><div class="mut">⚔️ galia ${fmt(e.pw)} · 🏅 ${fmt(e.rating)}</div><div class="mut">Laimėjimo šansas: ${chanceTag(estimate(P,e,S.hp))}</div></div></div></button>`).join('');
  const top=rows.slice(0,10).map((r,k)=>`<div class="rank ${r.me?'me':''}"><span>${k+1}</span><span>${esc(r.n)}</span><span>${fmt(r.p)}</span></div>`).join('');
@@ -1414,10 +1456,13 @@ function act(a,arg,btn){
  else if(a==='claimtour'){const r=Server.claimTour(S);if(r.err){toast(r.err);Snd.play('err');return}toast('🏆 '+r.t.n+': +'+fmt(r.t.zen)+' 🪙');Snd.play('lvl');if(btn)FX.at(btn,'#ffb02e',26)}
  else if(a==='train'){const[k,t]=arg.split(':'),r=Server.train(S,k,+t);if(r.err){toast(r.err);return}Snd.play('coin')}
  else if(a==='rush'){const r=Server.rush(S);if(r.err){toast(r.err);Snd.play('err');return}}
- else if(a==='equip'){Server.equip(S,+arg);Snd.play('loot')}
+ else if(a==='equip'){Server.equip(S,+arg);ui.eqView=null;Snd.play('loot')}
  else if(a==='sell'){toast('+'+Server.sell(S,+arg)+' 🪙');Snd.play('coin')}
  else if(a==='junk'){const z=Server.sellJunk(S);toast(z?'Parduota už '+fmt(z)+' 🪙':'Paprastų daiktų nėra.');if(z)Snd.play('coin')}
  else if(a==='bagfilter'){ui.bagFilter=arg;render();return}
+ else if(a==='eqview'){ui.eqView=arg;render();return}
+ else if(a==='eqclose'){ui.eqView=null;render();return}
+ else if(a==='uneq'){const r=Server.unequip(S,arg);if(r.err){toast(r.err);Snd.play('err');return}ui.eqView=null;toast(r.sold?'Kuprinė pilna — parduota už '+fmt(r.sold)+' 🪙':'Nusiimta');Snd.play(r.sold?'coin':'click');save();render();return}
  else if(a==='sellfilt'){const z=Server.sellFiltered(S,arg);toast(z?'Parduota už '+fmt(z)+' 🪙':'Nėra ką parduoti.');if(z)Snd.play('coin')}
  else if(a==='heal'){const r=Server.heal(S);if(r.err){toast(r.err);Snd.play('err');return}toast('Pagydyta už '+fmt(r.cost)+' 🪙');Snd.play('crystal')}
  else if(a==='potion'){const r=Server.potion(S);if(r.err){toast(r.err);Snd.play('err');return}Snd.play('crystal');if(btn)FX.at(btn,'#3ddc97',16)}
@@ -1494,7 +1539,8 @@ function adminCfg(a){
  if(a==='adef'){if(!confirm('Atstatyti visus nustatymus ir paveikslėlius?'))return;CFG=JSON.parse(JSON.stringify(DEF_CFG));saveCfg();toast('Atstatyta')}}
 
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;Snd.ac();if(!['fight','pvp'].includes(b.dataset.act))Snd.play('click');act(b.dataset.act,b.dataset.arg,b)});
-document.addEventListener('input',e=>{if(e.target.id==='nm')ui.name=e.target.value;if(e.target.id==='vol'){Snd.vol=+e.target.value;Snd.save()}});
+document.addEventListener('input',e=>{if(e.target.id==='nm')ui.name=e.target.value;if(e.target.id==='vol'){Snd.vol=+e.target.value;Snd.save()}
+ if(e.target.id==='bagq'){ui.bagSearch=e.target.value;render();const el=$('#bagq');if(el){el.focus();const v=el.value;el.value='';el.value=v}}});
 document.addEventListener('change',e=>{if(e.target.id==='vol')Snd.play('coin')});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='apw')act('alogin')});
 setInterval(tick,250);
