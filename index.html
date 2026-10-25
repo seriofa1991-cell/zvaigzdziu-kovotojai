@@ -716,6 +716,16 @@ const Server={
 };
 function leaderboard(p){const days=(Date.now()-p.created)/864e5,rows=BOTS.map((n,i)=>({n,p:Math.round(900*Math.pow(1.36,15-i)*(1+days*.05)*(.9+((i*37)%10)/50))}));
  rows.push({n:p.name,p:power(stats(p)),me:1});rows.sort((a,b)=>b.p-a.p);return rows}
+let RANK_CACHE=null,_rankFetchAt=0;
+function refreshRankList(){if(!fbOK)return Promise.resolve();
+ const now=Date.now();if(now-_rankFetchAt<15000)return Promise.resolve();_rankFetchAt=now;
+ return fbDb.collection('saves').orderBy('pwr','desc').limit(15).get().then(snap=>{
+  RANK_CACHE=snap.docs.map(d=>({uk:d.id,n:(d.data()||{}).name||d.id,p:(d.data()||{}).pwr||0}));
+  if(ui.tab==='arena')render()
+ }).catch(e=>{console.warn('rank fetch failed',e);if(RANK_CACHE===null)RANK_CACHE=[]})}
+function realLeaderboard(p){const myUk=USER,myP=power(stats(p));
+ let rows=(RANK_CACHE||[]).filter(r=>r.uk!==myUk).map(r=>({n:r.n,p:r.p,me:0}));
+ rows.push({n:p.name,p:myP,me:1});rows.sort((a,b)=>b.p-a.p);return rows}
 const ACC_KEY='zk_accounts',USER_KEY='zk_user';
 function accLoad(){try{return JSON.parse(localStorage.getItem(ACC_KEY))||{}}catch(e){return{}}}
 function accSave(a){try{localStorage.setItem(ACC_KEY,JSON.stringify(a))}catch(e){}}
@@ -837,7 +847,7 @@ const syncKey=u=>'zk_sync_'+u;
 let cloudSaveTimer=null;
 function pushCloudSave(){if(!fbOK||!USER||!S)return;
  const uk=USER,ts=Date.now();
- fbDb.collection('saves').doc(uk).set({json:JSON.stringify(S),savedAt:ts,name:S.name,lvl:S.lvl}).then(()=>{
+ fbDb.collection('saves').doc(uk).set({json:JSON.stringify(S),savedAt:ts,name:S.name,lvl:S.lvl,pwr:power(stats(S))}).then(()=>{
   try{localStorage.setItem(syncKey(uk),String(ts))}catch(e){}
  }).catch(e=>console.warn('cloud save failed',e))}
 function pullCloudSave(uk){if(!fbOK)return Promise.resolve();
@@ -1149,15 +1159,15 @@ function tabBag(){const st=stats(S),eb=equipBonus(S);
  ${filt!=='all'&&visInv.length?`<button class="sm" data-act="sellfilt" data-arg="${filt}" style="margin-bottom:10px">💰 Parduoti visus rodomus (${visInv.length})</button>`:''}
  ${inv||'<p class="mut">Tuščia pagal šį filtrą.</p>'}
  ${eqDetailOverlay()}`}
-function tabArena(){const P=stats(S),opps=Server.arenaOpps(S),rows=leaderboard(S),me=rows.findIndex(r=>r.me),left=Math.max(0,Math.ceil(SEASON_DAYS-(Date.now()-S.created)/864e5));
+function tabArena(){const P=stats(S),opps=Server.arenaOpps(S),rankLoading=fbOK&&RANK_CACHE===null,rows=rankLoading?[]:realLeaderboard(S),me=rows.findIndex(r=>r.me),left=Math.max(0,Math.ceil(SEASON_DAYS-(Date.now()-S.created)/864e5));
  const o=opps.map(e=>`<button data-act="pvp" data-arg="${e.i}" class="fb"><div class="row2"><div class="thumb">${fighterArt(e.race,true)}</div><div style="flex:1;min-width:0"><div class="row"><b>${esc(e.name)}</b><span class="tag">${RACES[e.race].ico} lyg. ${e.L}</span></div><div class="mut">⚔️ galia ${fmt(e.pw)} · 🏅 ${fmt(e.rating)}</div><div class="mut">Laimėjimo šansas: ${chanceTag(estimate(P,e,S.hp))}</div></div></div></button>`).join('');
- const top=rows.slice(0,10).map((r,k)=>`<div class="rank ${r.me?'me':''}"><span>${k+1}</span><span>${esc(r.n)}</span><span>${fmt(r.p)}</span></div>`).join('');
+ const top=rankLoading?'':rows.slice(0,15).map((r,k)=>`<div class="rank ${r.me?'me':''}"><span>${k+1}</span><span>${esc(r.n)}</span><span>${fmt(r.p)}</span></div>`).join('');
  const ach=ACH.map(a=>`<div class="ach ${S.ach[a.id]?'':'off'}"><span style="font-size:22px">${a.ico}</span><div style="flex:1"><b>${a.n}</b><div class="mut">${a.d}</div></div><span class="gold">${S.ach[a.id]?'✅':'+'+fmt(a.r)+' 🪙'}</span></div>`).join('');
  const wk=wkstr(Date.now());if(!S.tour||S.tour.wk!==wk)S.tour={wk,claimed:false};const tt=Server.tourTier(S);
  return banner()+header()+`<div class="card"><div class="row"><h2 style="margin:0">🏟️ Arena</h2><span class="tag gold">🏅 ${fmt(S.rating)} · ${S.arenaW}–${S.arenaL}</span></div><p class="mut" style="margin:6px 0 0">Kovok su kitais kovotojais dėl reitingo. Priešininkai keičiasi kas 10 min.</p></div>`
  +cdCard()+`<div class="grid" style="margin-bottom:12px">${o}</div>
  <div class="card"><div class="row"><h2 style="margin:0">🏆 Savaitinis turnyras</h2><span class="tag gold">${tt.n}</span></div><p class="mut" style="margin:6px 0">Apdovanojimas pagal tavo reitingą šios savaitės pabaigoje. Atsiimk kartą per savaitę.</p><button class="sm pri" data-act="claimtour" ${S.tour.claimed?'disabled':''}>${S.tour.claimed?'✔️ Jau atsiimta šią savaitę':'🎁 Atsiimti ('+fmt(tt.zen)+' 🪙)'}</button></div>
- <div class="card"><h2>🏆 Galios reitingas</h2>${top}${me>=10?`<div class="rank me"><span>${me+1}</span><span>${esc(S.name)}</span><span>${fmt(rows[me].p)}</span></div>`:''}<p class="mut">Demo reitingas su botais. Su tikru serveriu čia bus žaidėjai.</p></div>
+ <div class="card"><h2>🏆 Galios reitingas (TOP 15)</h2>${rankLoading?'<p class="mut">⏳ Kraunama...</p>':top}${!rankLoading&&me>=15?`<div class="rank me"><span>${me+1}</span><span>${esc(S.name)}</span><span>${fmt(rows[me].p)}</span></div>`:''}${!fbOK?'<p class="mut">Nėra ryšio su serveriu — rodomas tik tavo rezultatas.</p>':''}</div>
  <div class="card"><h2>🎖️ Pasiekimai (${Object.keys(S.ach).length}/${ACH.length})</h2>${ach}</div>
  <div class="card"><h2>Sezonas</h2><p style="margin:0">Liko apie <b>${left}</b> d. · Kovų: ${S.wins+S.losses} · Pergalių: ${S.wins} · Bosų: ${S.bosses}</p></div>`}
 function compCard(){const rows=COMPANIONS.map(c=>{const owned=S.comp.owned.includes(c.id),active=S.comp.active===c.id;
@@ -1556,7 +1566,7 @@ function act(a,arg,btn){
  if(a==='bossback'){ui.bossScreen=false;render();scrollTo(0,0);return}
  if(a==='race'){const n=$('#nm');if(n)ui.name=n.value;ui.race=arg;render();return}
  if(a==='create'){const n=($('#nm').value||'').trim();if(n.length<2){toast('Įvesk vardą (bent 2 raidės).');Snd.play('err');return}S=newState(n,ui.race);S.tutSeen=false;S.hp=stats(S).hp;save();ui.tab='kova';ui.zone=0;render();Snd.play('lvl');return}
- if(a==='tab'){ui.tab=arg;ui.bossScreen=false;if(arg==='guild'){if(S.guild)refreshGuildCache(S.guild);else refreshGuildList()}render();scrollTo(0,0);return}
+ if(a==='tab'){ui.tab=arg;ui.bossScreen=false;if(arg==='guild'){if(S.guild)refreshGuildCache(S.guild);else refreshGuildList()}else if(arg==='arena')refreshRankList();render();scrollTo(0,0);return}
  if(a==='alogin'){const v=($('#apw').value||'');sha(v).then(h=>{if(h===null){toast('Admin veikia tik per https://');return}if(h===ADMIN_HASH){ui.admin=true;try{sessionStorage.setItem('zk_admin','1')}catch(e){}toast('Prisijungta');render()}else{toast('Neteisingas slaptažodis');Snd.play('err')}});return}
  if(a==='alogout'){ui.admin=false;try{sessionStorage.removeItem('zk_admin')}catch(e){}ui.tab=S?'prof':'kova';render();return}
  if(a==='asave'||a==='aimg'||a==='aexp'||a==='aimp'||a==='adef'){if(!ui.admin)return;adminCfg(a);render();return}
