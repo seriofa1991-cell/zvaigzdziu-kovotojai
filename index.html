@@ -324,7 +324,7 @@ const MISSIONS=[
 ];
 
 const base=l=>({hp:60+22*l,atk:8+3.2*l,def:3+1.8*l,spd:5+.5*l});
-const xpNeed=l=>Math.round(40*Math.pow(l,1.55));
+const xpNeed=l=>Math.round(70*Math.pow(l,1.65));
 const dstr=t=>{const x=new Date(t);return x.getFullYear()+'-'+(x.getMonth()+1)+'-'+x.getDate()};
 const wkstr=t=>'W'+Math.floor(t/(7*864e5));
 const WBOSS_NAMES=['Pelenų Valdovas','Bedugnės Hidra','Žvaigždžių Rijikas','Amžinoji Vėtra','Akmenvaldas','Šešėlių Imperatorius'];
@@ -389,7 +389,13 @@ function hofUpdate(p){const h=hofLoad();const pw=power(stats(p));
 
 function newState(name,race){const now=Date.now();return{v:3,name,race,lvl:1,xp:0,hp:0,hpT:now,zen:30,train:{atk:0,def:0,hp:0,spd:0},training:null,equip:{},inv:[],runes:[],crystals:0,buffUntil:0,xpUntil:0,luckUntil:0,potions:1,lastBattle:0,wins:0,losses:0,bosses:0,legends:0,sets:0,arenaW:0,arenaL:0,rating:1000,actions:0,daily:{last:'',streak:0},ach:{},comp:{owned:[],active:null,lvl:{},xp:{},exped:null},today:{d:'',win:0,boss:0,train:0,arena:0,sell:0,spend:0},quests:{d:'',ids:[],claimed:[]},prestige:0,camp:{rod:false,bow:false,axe:false,pick:false,fireUntil:0,lastFish:0,lastHunt:0,lastFlint:0,lastChop:0,lastMine:0,wood:0,stone:0,raw:{fish:0,game:0},food:{fish:0,game:0}},town:{kalve:0,turgus:0,mokykla:0,izdine:0,uzeiga:0,bokstas:0,rezidencija:0,sandelis:0},farm:{plot:null,hen:false,cow:false,henLast:0,cowLast:0,crop:0,egg:0,milk:0},idleAt:now,missionIdx:0,wboss:{d:'',claimed:false,dmg:0},tour:{wk:'',claimed:false},weekly:{wk:'',claimed:false},talent:null,title:null,survival:{wave:0,best:0},keys:0,dungeon:null,ascend:0,craftBuffUntil:0,lastSeen:now,fishCaught:0,dungeonsWon:0,craftCount:0,statPts:0,alloc:{atk:0,def:0,hp:0,spd:0},marathon:{d:'',claimed:false,best:0},created:now,idc:1,tutSeen:true,guild:null,friends:[],activeArmed:false,activeSkillAt:0,seasonWins:0,profilePublic:true,raidCd:{}}}
 const LEVEL_PTS=3;
-function migrate(p){const hadNoStatPts=p.statPts===undefined;const d=newState(p.name,p.race);for(const k in d)if(p[k]===undefined)p[k]=d[k];
+const RESET_V=1; // keliamas skaičius = visų žaidėjų progresas atstatomas į 1 lygį
+function migrate(p){
+ if((p.resetV||0)<RESET_V){const fr=newState(p.name,p.race),keep={name:1,race:1,guild:1,friends:1,profilePublic:1};
+  for(const k in fr)if(!keep[k])p[k]=fr[k];
+  p.resetV=RESET_V;p.hp=stats(p).hp;
+ }
+ const hadNoStatPts=p.statPts===undefined;const d=newState(p.name,p.race);for(const k in d)if(p[k]===undefined)p[k]=d[k];
  if(hadNoStatPts)p.statPts=Math.max(0,(p.lvl-1))*LEVEL_PTS;
  if(!p.alloc)p.alloc={atk:0,def:0,hp:0,spd:0};
  if(p.daily&&p.daily.total===undefined)p.daily.total=p.daily.streak||0;
@@ -1565,7 +1571,7 @@ function act(a,arg,btn){
  if(a==='bosses'){ui.bossScreen=true;render();scrollTo(0,0);return}
  if(a==='bossback'){ui.bossScreen=false;render();scrollTo(0,0);return}
  if(a==='race'){const n=$('#nm');if(n)ui.name=n.value;ui.race=arg;render();return}
- if(a==='create'){const n=($('#nm').value||'').trim();if(n.length<2){toast('Įvesk vardą (bent 2 raidės).');Snd.play('err');return}S=newState(n,ui.race);S.tutSeen=false;S.hp=stats(S).hp;save();ui.tab='kova';ui.zone=0;render();Snd.play('lvl');return}
+ if(a==='create'){const n=($('#nm').value||'').trim();if(n.length<2){toast('Įvesk vardą (bent 2 raidės).');Snd.play('err');return}S=newState(n,ui.race);S.tutSeen=false;S.resetV=RESET_V;S.hp=stats(S).hp;save();ui.tab='kova';ui.zone=0;render();Snd.play('lvl');return}
  if(a==='tab'){ui.tab=arg;ui.bossScreen=false;if(arg==='guild'){if(S.guild)refreshGuildCache(S.guild);else refreshGuildList()}else if(arg==='arena')refreshRankList();render();scrollTo(0,0);return}
  if(a==='alogin'){const v=($('#apw').value||'');sha(v).then(h=>{if(h===null){toast('Admin veikia tik per https://');return}if(h===ADMIN_HASH){ui.admin=true;try{sessionStorage.setItem('zk_admin','1')}catch(e){}toast('Prisijungta');render()}else{toast('Neteisingas slaptažodis');Snd.play('err')}});return}
  if(a==='alogout'){ui.admin=false;try{sessionStorage.removeItem('zk_admin')}catch(e){}ui.tab=S?'prof':'kova';render();return}
