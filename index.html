@@ -360,7 +360,7 @@ function ensureToday(p){const d=dstr(Date.now());
  if(p.today.d!==d)p.today={d,win:0,boss:0,train:0,arena:0,sell:0,spend:0};
  if(p.quests.d!==d){const R=rng(hash(p.name+d)),pool=QUEST_POOL.slice(),ids=[];while(ids.length<3&&pool.length)ids.push(pool.splice((R()*pool.length)|0,1)[0].id);p.quests={d,ids,claimed:[]}}}
 const CHEST_DEFS={
- bronze:{n:'Bronzinė dėžė',ico:'📦',c:'#b08d57',free:1,dailyLimit:5,d:'Paprasti palydovai, paprasta ginkluotė ir ištekliai.'},
+ bronze:{n:'Bronzinė dėžė',ico:'📦',c:'#b08d57',free:1,max:5,regenMs:20*60000,d:'Paprasti palydovai, paprasta ginkluotė ir ištekliai. Viena dėžė atsinaujina kas 20 min.'},
  silver:{n:'Sidabrinė dėžė',ico:'🎁',c:'#c9d3e0',free:1,cooldownMs:6*3600000,d:'Geresni palydovai ir ginkluotė nei bronzinėje, didesni kiekiai.'},
  gold:{n:'Auksinė dėžė',ico:'🏆',c:'#ffb02e',free:0,rub:100,d:'Tik geriausi palydovai ir epinė/legendinė ginkluotė — už rubinus.'}
 };
@@ -371,10 +371,12 @@ const CHEST_RES_POOL=[
  {k:'milk',n:'Pienas',ico:'🥛',add:(p,n)=>p.farm.milk=(p.farm.milk||0)+n},
  {k:'egg',n:'Kiaušiniai',ico:'🥚',add:(p,n)=>p.farm.egg=(p.farm.egg||0)+n}
 ];
-function ensureChests(p){if(!p.chests)p.chests={d:'',bronze:0,silverNext:0};const d=dstr(Date.now());if(p.chests.d!==d){p.chests.d=d;p.chests.bronze=0}}
-function chestFreeReady(p){if(!p.chests)return true;const d=dstr(Date.now());
- const bronzeLeft=p.chests.d!==d?CHEST_DEFS.bronze.dailyLimit:CHEST_DEFS.bronze.dailyLimit-(p.chests.bronze||0);
- return bronzeLeft>0||Date.now()>=(p.chests.silverNext||0)}
+function ensureChests(p){if(!p.chests)p.chests={bronze:CHEST_DEFS.bronze.max,bronzeAt:Date.now(),silverNext:0};
+ if(p.chests.bronzeAt===undefined){p.chests.bronze=CHEST_DEFS.bronze.max;p.chests.bronzeAt=Date.now();delete p.chests.d}
+ if(p.chests.bronze<CHEST_DEFS.bronze.max){const ticks=Math.floor((Date.now()-p.chests.bronzeAt)/CHEST_DEFS.bronze.regenMs);
+  if(ticks>0){p.chests.bronze=Math.min(CHEST_DEFS.bronze.max,p.chests.bronze+ticks);p.chests.bronzeAt+=ticks*CHEST_DEFS.bronze.regenMs}}}
+function chestFreeReady(p){if(!p.chests||p.chests.bronzeAt===undefined)return true;
+ return (p.chests.bronze||0)>0||Date.now()>=(p.chests.silverNext||0)}
 function pickWeighted(rows){let x=Math.random()*rows.reduce((a,r)=>a+r[0],0);for(const r of rows){x-=r[0];if(x<=0)return r[1]}return rows[rows.length-1][1]}
 function rollChestReward(p,tier,res){
  if(tier==='bronze'){
@@ -429,7 +431,7 @@ function hofUpdate(p){const h=hofLoad();const pw=power(stats(p));
  let changed=false;for(const k in cands){const v=cands[k].v;if(!h[k]||v>h[k].v){h[k]={v,n:p.name,d:Date.now()};changed=true}}
  if(changed)hofSave(h);return h}
 
-function newState(name,race){const now=Date.now();return{v:3,name,race,lvl:1,xp:0,hp:0,hpT:now,zen:30,train:{atk:0,def:0,hp:0,spd:0},training:null,equip:{},inv:[],runes:[],crystals:0,rub:0,rubLifetime:0,buffUntil:0,xpUntil:0,luckUntil:0,potions:1,lastBattle:0,wins:0,losses:0,bosses:0,legends:0,sets:0,arenaW:0,arenaL:0,rating:1000,actions:0,daily:{last:'',streak:0},ach:{},comp:{owned:[],active:null,lvl:{},xp:{},exped:null},today:{d:'',win:0,boss:0,train:0,arena:0,sell:0,spend:0},quests:{d:'',ids:[],claimed:[]},prestige:0,camp:{rod:false,bow:false,axe:false,pick:false,fireUntil:0,lastFish:0,lastHunt:0,lastFlint:0,lastChop:0,lastMine:0,wood:0,stone:0,raw:{fish:0,game:0},food:{fish:0,game:0}},town:{kalve:0,turgus:0,mokykla:0,izdine:0,uzeiga:0,bokstas:0,rezidencija:0,sandelis:0},farm:{plot:null,hen:false,cow:false,henLast:0,cowLast:0,crop:0,egg:0,milk:0},idleAt:now,missionIdx:0,wboss:{d:'',claimed:false,dmg:0},tour:{wk:'',claimed:false},weekly:{wk:'',claimed:false},talent:null,title:null,survival:{wave:0,best:0},keys:0,dungeon:null,ascend:0,craftBuffUntil:0,lastSeen:now,fishCaught:0,dungeonsWon:0,craftCount:0,statPts:0,alloc:{atk:0,def:0,hp:0,spd:0},marathon:{d:'',claimed:false,best:0},created:now,idc:1,tutSeen:true,guild:null,friends:[],activeArmed:false,activeSkillAt:0,seasonWins:0,profilePublic:true,raidCd:{},chests:{d:'',bronze:0,silverNext:0}}}
+function newState(name,race){const now=Date.now();return{v:3,name,race,lvl:1,xp:0,hp:0,hpT:now,zen:30,train:{atk:0,def:0,hp:0,spd:0},training:null,equip:{},inv:[],runes:[],crystals:0,rub:0,rubLifetime:0,buffUntil:0,xpUntil:0,luckUntil:0,potions:1,lastBattle:0,wins:0,losses:0,bosses:0,legends:0,sets:0,arenaW:0,arenaL:0,rating:1000,actions:0,daily:{last:'',streak:0},ach:{},comp:{owned:[],active:null,lvl:{},xp:{},exped:null},today:{d:'',win:0,boss:0,train:0,arena:0,sell:0,spend:0},quests:{d:'',ids:[],claimed:[]},prestige:0,camp:{rod:false,bow:false,axe:false,pick:false,fireUntil:0,lastFish:0,lastHunt:0,lastFlint:0,lastChop:0,lastMine:0,wood:0,stone:0,raw:{fish:0,game:0},food:{fish:0,game:0}},town:{kalve:0,turgus:0,mokykla:0,izdine:0,uzeiga:0,bokstas:0,rezidencija:0,sandelis:0},farm:{plot:null,hen:false,cow:false,henLast:0,cowLast:0,crop:0,egg:0,milk:0},idleAt:now,missionIdx:0,wboss:{d:'',claimed:false,dmg:0},tour:{wk:'',claimed:false},weekly:{wk:'',claimed:false},talent:null,title:null,survival:{wave:0,best:0},keys:0,dungeon:null,ascend:0,craftBuffUntil:0,lastSeen:now,fishCaught:0,dungeonsWon:0,craftCount:0,statPts:0,alloc:{atk:0,def:0,hp:0,spd:0},marathon:{d:'',claimed:false,best:0},created:now,idc:1,tutSeen:true,guild:null,friends:[],activeArmed:false,activeSkillAt:0,seasonWins:0,profilePublic:true,raidCd:{},chests:{bronze:5,bronzeAt:now,silverNext:0}}}
 const LEVEL_PTS=3;
 const RESET_V=1; // keliamas skaičius = visų žaidėjų progresas atstatomas į 1 lygį
 function migrate(p){
@@ -671,7 +673,7 @@ const Server={
   const it=genLegendaryForSlot(p.lvl,slot),res={};Server.addItem(p,it,res);return{ok:1,item:res.item,sold:res.sold}},
  openChest(p,tier){const def=CHEST_DEFS[tier];if(!def)return{err:'Nežinoma dėžė.'};
   ensureChests(p);
-  if(tier==='bronze'){if(p.chests.bronze>=def.dailyLimit)return{err:'Šiandien nebeliko nemokamų bronzinių dėžių.'};p.chests.bronze++}
+  if(tier==='bronze'){if(p.chests.bronze<1)return{err:'Bronzinė dėžė dar neparuošta.'};const wasFull=p.chests.bronze>=def.max;p.chests.bronze--;if(wasFull)p.chests.bronzeAt=Date.now()}
   else if(tier==='silver'){if(Date.now()<p.chests.silverNext)return{err:'Sidabrinė dėžė dar neparuošta.'};p.chests.silverNext=Date.now()+def.cooldownMs}
   else if(tier==='gold'){if((p.rub||0)<def.rub)return{err:'Neužtenka rubinų ('+def.rub+' 🔷).'};p.rub-=def.rub}
   const res={ok:1,tier};rollChestReward(p,tier,res);return res},
@@ -1448,7 +1450,8 @@ function tabProf(){const r=RACES[S.race];return banner()+`<div class="card" styl
 function tabGuild(){return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>${guildCard()}`}
 function tabFriends(){return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>${friendsCard()}`}
 function tabChests(){ensureChests(S);
- const bronzeLeft=Math.max(0,CHEST_DEFS.bronze.dailyLimit-(S.chests.bronze||0));
+ const bronzeHave=S.chests.bronze||0,bronzeFull=bronzeHave>=CHEST_DEFS.bronze.max;
+ const bronzeNextIn=bronzeFull?0:CHEST_DEFS.bronze.regenMs-(Date.now()-S.chests.bronzeAt);
  const silverWait=Math.max(0,(S.chests.silverNext||0)-Date.now());
  const row=(tier,statusHtml,canOpen)=>{const d=CHEST_DEFS[tier];
   return`<div class="card" style="text-align:center"><div style="font-size:54px">${d.ico}</div><h2 style="margin:6px 0 2px;color:${d.c}">${d.n}</h2>
@@ -1456,7 +1459,7 @@ function tabChests(){ensureChests(S);
   <button class="pri" data-act="openchest" data-arg="${tier}" style="width:100%;margin-top:8px" ${canOpen?'':'disabled'}>🔓 Atidaryti</button></div>`};
  return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>
  <h2 style="margin:0 0 4px">📦 Dėžės</h2><p class="mut" style="margin-top:0">Atidaryk dėžes ir gauk palydovų, ginkluotės ar išteklių.</p>
- ${row('bronze',`<span class="tag">Likę šiandien: ${bronzeLeft}/${CHEST_DEFS.bronze.dailyLimit}</span>`,bronzeLeft>0)}
+ ${row('bronze',`<span class="tag">Turimos: ${bronzeHave}/${CHEST_DEFS.bronze.max}</span>${bronzeFull?'':` <span class="mut">⏳ Kita po ${mins(Date.now()+bronzeNextIn)}</span>`}`,bronzeHave>0)}
  ${row('silver',silverWait>0?`<span class="tag">⏳ Paruoš po ${mins(Date.now()+silverWait)}</span>`:`<span class="tag ok">Paruošta!</span>`,silverWait<=0)}
  ${row('gold',`<span class="tag gold">Kaina: ${CHEST_DEFS.gold.rub} 🔷 (turi ${S.rub||0} 🔷)</span>`,(S.rub||0)>=CHEST_DEFS.gold.rub)}`}
 function tabAdmin(){
