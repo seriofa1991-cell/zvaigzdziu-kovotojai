@@ -1299,16 +1299,26 @@ function playtimeStr(ms){const h=Math.floor(ms/3600000),d=Math.floor(h/24);if(d>
 function statsCard(){const total=S.wins+S.losses,wr=total?Math.round(S.wins/total*100):0,atotal=S.arenaW+S.arenaL,awr=atotal?Math.round(S.arenaW/atotal*100):0;
  const rows=[['⏱️ Žaidimo laikas',playtimeStr(Date.now()-S.created)],['⚔️ Kovų iš viso',fmt(total)+' ('+wr+'% pergalių)'],['👑 Nugalėti bosai',fmt(S.bosses)],['🏟️ Arenos kovų',fmt(atotal)+' ('+awr+'% pergalių)'],['💎 Surinkti rinkiniai',fmt(S.sets)],['🟨 Rasti legendiniai',fmt(S.legends)],['🐾 Palydovų',S.comp.owned.length+'/'+COMPANIONS.length],['🎖️ Pasiekimų',Object.keys(S.ach).length+'/'+ACH.length],['📅 Dovanų serija',fmt(S.daily.streak)+' d.'],['🔁 Veiksmų',fmt(S.actions)]];
  return`<div class="card"><h2>📊 Statistika</h2>${rows.map(([l,v])=>`<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="mut">${l}</span><b>${v}</b></div>`).join('')}</div>`}
+const GUILD_TRACKS=[{ico:'⚔️',n:'Puolimo mokslas'},{ico:'🛡️',n:'Gynybos mokslas'},{ico:'💰',n:'Prekybos kelias'},{ico:'📜',n:'Mokslo centras'}];
 function guildCard(){
  if(S.guild){const g=GUILD_CACHE[S.guild];
   if(!g)return`<div class="card"><h2>🏰 Gildija</h2><p class="mut">⏳ Kraunama...</p></div>`;
   const lvl=guildLevel(g),bonus=Math.round(guildBonus(S)*100),mkeys=Object.keys(g.members||{});
+  let totalPower=0,knownAll=true;
   const members=mkeys.map(uk=>({uk,...g.members[uk]})).sort((a,b)=>(b.contrib||0)-(a.contrib||0)).map(m=>{const lite=readUserLite(m.uk,USER),nm=lite?lite.name:m.uk;
+   if(lite&&!lite.hidden&&typeof lite.power==='number')totalPower+=lite.power;else knownAll=false;
    return`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${esc(nm)}</b>${m.uk===g.founder?' <span class="tag gold">👑 Įkūrėjas</span>':''}${m.uk===USER?' <span class="tag ok">Tu</span>':''}${lite&&!lite.hidden?` <span class="mut">· lyg. ${lite.lvl} · ⚡${fmt(lite.power)}</span>`:lite&&lite.hidden?' <span class="mut">· 🔒 paslėptas</span>':''}</div><span class="mut">${fmt(m.contrib||0)} 🪙</span></div>`}).join('');
   const invRows=S.inv.slice(0,12).map(it=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)">${itemArt(it)}<div style="flex:1;min-width:0">${itemLine(it)}</div><button class="sm" data-act="guilddonateitem" data-arg="${it.id}">💰 ${fmt(Math.round(RAR[it.r].sell*(1+it.lv/10)))}</button></div>`).join('');
-  return`<div class="card"><div class="row"><h2 style="margin:0">${g.ico} ${esc(g.name)}</h2><span class="tag gold">Pastato lyg. ${lvl}</span></div>
-  <p class="mut" style="margin:6px 0">${mkeys.length}/30 narių · Iždas: ${fmt(g.treasury||0)} 🪙 · Bonusas visiems nariams: +${bonus}% monetų ir patirties iš kovų</p>
-  ${members}
+  const leaderLite=readUserLite(g.founder,USER),leaderName=leaderLite?leaderLite.name:g.founder;
+  const prevT=300*(lvl-1)*(lvl-1),nextT=300*lvl*lvl,prog=clamp(((g.treasury||0)-prevT)/(nextT-prevT)*100,0,100);
+  const tracks=GUILD_TRACKS.map(t=>`<div class="row2" style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="font-size:22px;flex:none">${t.ico}</div><div style="flex:1;min-width:0"><b style="font-size:14px">${t.n}</b><div class="bar" style="margin-top:4px"><i style="width:${prog}%"></i></div></div><span class="tag gold" style="flex:none">Lyg. ${lvl}</span></div>`).join('');
+  return`<div class="card"><div class="row2" style="align-items:flex-start">
+  <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-size:30px;flex:none">${g.ico}</div>
+  <div style="flex:1;min-width:0"><h1 style="margin:0;font-size:19px">${esc(g.name)}</h1><p class="mut" style="margin:4px 0 0">👑 Lyderis: ${esc(leaderName)}</p>
+  <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap;justify-content:flex-start"><span class="tag gold">⚡ Galia ${fmt(totalPower)}${knownAll?'':'+'}</span><span class="tag">👥 ${mkeys.length}/30</span><span class="tag">🏛️ Lyg. ${lvl}</span></div></div></div>
+  <p class="mut" style="margin:10px 0 0">Iždas: ${fmt(g.treasury||0)} 🪙 · Bonusas visiems nariams: +${bonus}% monetų ir patirties iš kovų</p>
+  <h2 style="margin:14px 0 2px">🏛️ Gildijos vystymas</h2>${tracks}
+  <h2 style="margin:14px 0 2px">👥 Nariai</h2>${members}
   <div class="row" style="margin-top:10px;gap:6px"><input id="gdon" type="number" min="1" placeholder="Suma" style="flex:1"><button class="sm pri" data-act="guilddonate">💰 Aukoti monetų</button></div>
   <p class="mut" style="margin:10px 0 4px"><b>Aukoti daiktą iš kuprinės (kelia pastato lygį):</b></p>
   ${invRows||'<p class="mut">Kuprinė tuščia.</p>'}
