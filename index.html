@@ -1104,6 +1104,8 @@ const MONSTER_TRAITS={
  'Kalėdų Demonas':{type:'armored',c1:'#c0392b',c2:'#1a4a2a'},
  'Požemio Valdovas':{type:'armored',c1:'#3a1a1a',c2:'#9a1a1a',crown:1}
 };
+/* ---------- TIKRI 2D PAVEIKSLĖLIAI (sugeneruoti, Meta AI) ---------- */
+const MONSTER_IMG={'Dulkių vilkas':'img/mon/dulkiu-vilkas.webp','Goblinas žvalgas':'img/mon/goblinas-zvalgas.webp','Pievų karalius':'img/mon/pievu-karalius.webp','Šakų vaiduoklis':'img/mon/saku-vaiduoklis.webp','Samanų trolis':'img/mon/samanu-trolis.webp','Miško šikšnosparnis':'img/mon/misko-siksnosparnis.webp','Senasis ąžuolas':'img/mon/senasis-azuolas.webp','Smėlio skorpionas':'img/mon/smelio-skorpionas.webp','Miražo žvėris':'img/mon/mirazo-zveris.webp','Dulkių klajoklis':'img/mon/dulkiu-klajoklis.webp','Stiklo vyras':'img/mon/stiklo-vyras.webp','Pelenų riteris':'img/mon/pelenu-riteris.webp','Žarijų drakonėlis':'img/mon/zariju-drakonelis.webp','Ugnikalnio valdovas':'img/mon/ugnikalnio-valdovas.webp','Kristalų voras':'img/mon/kristalu-voras.webp','Urvų golemas':'img/mon/urvu-golemas.webp','Spindinti gyvatė':'img/mon/spindinti-gyvate.webp','Kristalų karalienė':'img/mon/kristalu-karaliene.webp','Vėjo sargas':'img/mon/vejo-sargas.webp','Perkūno paukštis':'img/mon/perkuno-paukstis.webp','Debesų vienuolis':'img/mon/debesu-vienuolis.webp','Audrų dievaitis':'img/mon/audru-dievaitis.webp','Tuštumos kovotojas':'img/mon/tustumos-kovotojas.webp','Kometų medžiotojas':'img/mon/kometu-medziotojas.webp','Eklipso sargas':'img/mon/eklipso-sargas.webp','Žvaigždžių tironas':'img/mon/zvaigzdziu-tironas.webp','Tuštumos šešėlis':'img/mon/tustumos-seselis.webp','Amžinybės sargas':'img/mon/amzinybes-sargas.webp','Laiko fantomas':'img/mon/laiko-fantomas.webp','Sostų šešėlis':'img/mon/sostu-seselis.webp','Paskutinis Valdovas':'img/mon/paskutinis-valdovas.webp','Pelenų Valdovas':'img/mon/pelenu-valdovas.webp','Bedugnės Hidra':'img/mon/bedugnes-hidra.webp','Akmenvaldas':'img/mon/akmenvaldas.webp','Šešėlių Imperatorius':'img/mon/seseliu-imperatorius.webp','Žiemos Valdovas':'img/mon/ziemos-valdovas.webp','Įsimylėjėlių Šmėkla':'img/mon/isimylejeliu-smekla.webp','Pavasario Dvasia':'img/mon/pavasario-dvasia.webp','Perkūno Sargas':'img/mon/perkuno-sargas.webp','Saulėgrįžos Feniksas':'img/mon/saulegrizos-feniksas.webp','Vasaros Krakenas':'img/mon/vasaros-krakenas.webp','Derliaus Žvėris':'img/mon/derliaus-zveris.webp','Helovino Košmaras':'img/mon/helovino-kosmaras.webp','Rūkų Šmėkla':'img/mon/ruku-smekla.webp','Kalėdų Demonas':'img/mon/kaledu-demonas.webp','Požemio Valdovas':'img/mon/pozemio-valdovas.webp'};
 function creatureSVG(traits,name,boss,flip){
  const R=rng(hash(name)),jig=.92+R()*.16,sz=(boss?1.22:1)*jig,c1=traits.c1,c2=traits.c2;
  let inner='';
@@ -1200,7 +1202,8 @@ function creatureSVG(traits,name,boss,flip){
   default: return monsterArtBlob(name,{mon:[c1,c2]},boss,flip);
  }
  return`<svg class="art fig${flip?' flip':''}" viewBox="0 0 100 120">${inner}</svg>`}
-function monsterArt(name,z,boss,flip){const key=(boss?'boss:':'enemy:')+z.id;if(CFG.img[key])return imgTag(CFG.img[key],flip);
+function monsterArt(name,z,boss,flip){if(MONSTER_IMG[name])return imgTag(MONSTER_IMG[name],flip);
+ const key=(boss?'boss:':'enemy:')+z.id;if(CFG.img[key])return imgTag(CFG.img[key],flip);
  const traits=MONSTER_TRAITS[name];
  if(traits)return creatureSVG(traits,name,boss,flip);
  return monsterArtBlob(name,z,boss,flip)}
