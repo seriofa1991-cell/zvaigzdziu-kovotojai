@@ -1031,7 +1031,7 @@ function fighterArt(rk,flip){if(CFG.img['race:'+rk])return imgTag(CFG.img['race:
  <circle cx="50" cy="42" r="17" fill="${c[3]}"/>${hair}
  <path d="M41 41 l7 2.5 M59 41 l-7 2.5" stroke="#111" stroke-width="2.6" stroke-linecap="round"/>
  <path d="M45 52 q5 2.5 10 0" stroke="#111" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`}
-function monsterArt(name,z,boss,flip){const key=(boss?'boss:':'enemy:')+z.id;if(CFG.img[key])return imgTag(CFG.img[key],flip);
+function monsterArtBlob(name,z,boss,flip){
  const R=rng(hash(name)),g=gid(),col=z.mon[(R()*z.mon.length)|0],eyes=1+((R()*3)|0),horns=(R()*3)|0,w=30+R()*10+(boss?6:0),h=28+R()*10+(boss?6:0),cy=72,top=cy-h;
  let s=`<svg class="art fig${flip?' flip':''}" viewBox="0 0 100 120"><defs><radialGradient id="${g}" cx=".38" cy=".3"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".35" stop-color="${col}"/><stop offset="1" stop-color="#000" stop-opacity=".75"/></radialGradient></defs>`;
  if(boss)s+=`<ellipse class="aura" cx="50" cy="70" rx="50" ry="50" fill="${col}" opacity=".3"/>`;
@@ -1043,6 +1043,167 @@ function monsterArt(name,z,boss,flip){const key=(boss?'boss:':'enemy:')+z.id;if(
  s+=`<path d="${mouth}" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"/>`;
  if(boss)s+=`<path d="M36 ${top-4} L38 ${top-20} L44 ${top-10} L50 ${top-24} L56 ${top-10} L62 ${top-20} L64 ${top-4}Z" fill="#ffb02e" stroke="#7a4a00" stroke-width="1"/>`;
  return s+'</svg>'}
+/* ---------- UNIKALUS KIEKVIENO PRIEŠO/BOSO SILUETAS ---------- */
+function peyes(cx,cy,n,r,boss){let s='';for(let i=0;i<n;i++){const x=cx+(i-(n-1)/2)*(r*2.3);s+=`<circle cx="${x}" cy="${cy}" r="${r}" fill="${boss?'#ffe066':'#fff'}"/><circle cx="${(x+r*.15).toFixed(1)}" cy="${(cy+r*.15).toFixed(1)}" r="${(r*.45).toFixed(1)}" fill="${boss?'#c00':'#111'}"/>`}return s}
+function pcrown(cx,topY){return`<path d="M${cx-14} ${topY+10} L${cx-14} ${topY} L${cx-7} ${topY+7} L${cx} ${topY-8} L${cx+7} ${topY+7} L${cx+14} ${topY} L${cx+14} ${topY+10}Z" fill="#ffd700" stroke="#7a5a00" stroke-width="1"/>`}
+function paura(col){return`<ellipse class="aura" cx="50" cy="70" rx="50" ry="50" fill="${col}" opacity=".3"/>`}
+const MONSTER_TRAITS={
+ 'Pievų vabalas':{type:'insect',c1:'#8bc34a',c2:'#5a8f2e'},
+ 'Dulkių vilkas':{type:'canine',c1:'#c0a060',c2:'#8a6a3a'},
+ 'Goblinas žvalgas':{type:'humanoid',c1:'#6d9f3c',c2:'#4a6b28'},
+ 'Pievų karalius':{type:'humanoid',c1:'#d4af37',c2:'#6d9f3c',crown:1,robe:1},
+ 'Šakų vaiduoklis':{type:'ghost',c1:'#9fd8a0',c2:'#2e5a3c'},
+ 'Samanų trolis':{type:'ogre',c1:'#5a8f4e',c2:'#2e5a3c'},
+ 'Miško šikšnosparnis':{type:'bat',c1:'#3e6e6a',c2:'#1f4630'},
+ 'Senasis ąžuolas':{type:'tree',c1:'#6b4a2a',c2:'#3f8a45'},
+ 'Smėlio skorpionas':{type:'spider',c1:'#e0c080',c2:'#a06a30',tail:1},
+ 'Miražo žvėris':{type:'canine',c1:'#e0c080',c2:'#c86a3a'},
+ 'Dulkių klajoklis':{type:'humanoid',c1:'#d4a050',c2:'#a06a30',robe:1},
+ 'Stiklo vyras':{type:'golem',c1:'#cfe8ff',c2:'#7fc8ff'},
+ 'Lavos šuo':{type:'canine',c1:'#e0542e',c2:'#9a3a1a'},
+ 'Pelenų riteris':{type:'armored',c1:'#4a2a2a',c2:'#ff8a1f'},
+ 'Žarijų drakonėlis':{type:'dragon',c1:'#ff8a1f',c2:'#9a3a1a'},
+ 'Ugnikalnio valdovas':{type:'armored',c1:'#2a0a0a',c2:'#ffb02e',crown:1},
+ 'Kristalų voras':{type:'spider',c1:'#6ad0ff',c2:'#2a3a7a'},
+ 'Urvų golemas':{type:'golem',c1:'#4ab0c0',c2:'#2a2f6a'},
+ 'Spindinti gyvatė':{type:'serpent',c1:'#9fe8ff',c2:'#6ad0ff'},
+ 'Kristalų karalienė':{type:'humanoid',c1:'#9a7aff',c2:'#9fe8ff',crown:1,robe:1},
+ 'Vėjo sargas':{type:'armored',c1:'#e0e6ff',c2:'#8ab4ff'},
+ 'Perkūno paukštis':{type:'bird',c1:'#ffe080',c2:'#a0c0ff'},
+ 'Debesų vienuolis':{type:'humanoid',c1:'#c8d4f0',c2:'#8898c8',robe:1},
+ 'Audrų dievaitis':{type:'bird',c1:'#ffffff',c2:'#8ab4ff',crown:1},
+ 'Tuštumos kovotojas':{type:'armored',c1:'#2a1050',c2:'#ff5c9a'},
+ 'Kometų medžiotojas':{type:'humanoid',c1:'#6c8cff',c2:'#b36bff'},
+ 'Eklipso sargas':{type:'armored',c1:'#24104a',c2:'#ffd1ff'},
+ 'Žvaigždžių tironas':{type:'armored',c1:'#140828',c2:'#ffd1ff',crown:1},
+ 'Tuštumos šešėlis':{type:'ghost',c1:'#6a2a6a',c2:'#000000'},
+ 'Laiko ryjikas':{type:'eye',c1:'#ff3060',c2:'#1a0a1a',maw:1},
+ 'Bedugnės akis':{type:'eye',c1:'#9a1a4a',c2:'#000000'},
+ 'Pirmapradis Chaosas':{type:'eye',c1:'#ff3060',c2:'#2a0a2a',maw:1,crown:1},
+ 'Amžinybės sargas':{type:'armored',c1:'#8a5aff',c2:'#1a0a2e'},
+ 'Laiko fantomas':{type:'ghost',c1:'#d4af37',c2:'#3a1a5e'},
+ 'Sostų šešėlis':{type:'ghost',c1:'#5a2a8e',c2:'#120522'},
+ 'Paskutinis Valdovas':{type:'armored',c1:'#ffd700',c2:'#1a0a2e',crown:1},
+ 'Pelenų Valdovas':{type:'armored',c1:'#5a5a5a',c2:'#ff8a1f',crown:1},
+ 'Bedugnės Hidra':{type:'hydra',c1:'#2a6a4a',c2:'#0a2a1a'},
+ 'Žvaigždžių Rijikas':{type:'eye',c1:'#ffd1ff',c2:'#140828',maw:1},
+ 'Amžinoji Vėtra':{type:'bird',c1:'#cfe8ff',c2:'#4a7ab0'},
+ 'Akmenvaldas':{type:'golem',c1:'#9a9a9a',c2:'#5a5a5a',crown:1},
+ 'Šešėlių Imperatorius':{type:'ghost',c1:'#3a1a4a',c2:'#000000',crown:1},
+ 'Žiemos Valdovas':{type:'armored',c1:'#cfe8ff',c2:'#6ad0ff',crown:1},
+ 'Įsimylėjėlių Šmėkla':{type:'ghost',c1:'#ff9ac0',c2:'#ff5c9a'},
+ 'Pavasario Dvasia':{type:'fae',c1:'#8bc34a',c2:'#ffb6d9'},
+ 'Perkūno Sargas':{type:'armored',c1:'#ffe066',c2:'#4a7ab0'},
+ 'Žydėjimo Karalienė':{type:'fae',c1:'#ff6fae',c2:'#8bc34a',crown:1},
+ 'Saulėgrįžos Feniksas':{type:'phoenix',c1:'#ff8a1f',c2:'#ffd700'},
+ 'Vasaros Krakenas':{type:'kraken',c1:'#1fa7c9',c2:'#0a4a5a'},
+ 'Dykumos Mirahas':{type:'canine',c1:'#e0a85a',c2:'#c48a40'},
+ 'Derliaus Žvėris':{type:'ogre',c1:'#c97a3a',c2:'#6b4a2a'},
+ 'Helovino Košmaras':{type:'ghost',c1:'#ff8a1f',c2:'#1a0a1a'},
+ 'Rūkų Šmėkla':{type:'ghost',c1:'#cfd8e0',c2:'#8a98a8'},
+ 'Kalėdų Demonas':{type:'armored',c1:'#c0392b',c2:'#1a4a2a'},
+ 'Požemio Valdovas':{type:'armored',c1:'#3a1a1a',c2:'#9a1a1a',crown:1}
+};
+function creatureSVG(traits,name,boss,flip){
+ const R=rng(hash(name)),jig=.92+R()*.16,sz=(boss?1.22:1)*jig,c1=traits.c1,c2=traits.c2;
+ let inner='';
+ if(boss||traits.aura)inner+=paura(c1);
+ switch(traits.type){
+  case'insect':{const w=20*sz,h=14*sz,cy=72;
+   inner+=`<path d="M50 ${cy-h} L46 ${cy-h-12} M50 ${cy-h} L54 ${cy-h-12}" stroke="${c2}" stroke-width="2" stroke-linecap="round"/>`;
+   for(let i=-1;i<=1;i++){inner+=`<path d="M${50-w*.55} ${cy+i*8} L${50-w*1.05} ${cy+i*8+10}" stroke="${c2}" stroke-width="3" stroke-linecap="round"/><path d="M${50+w*.55} ${cy+i*8} L${50+w*1.05} ${cy+i*8+10}" stroke="${c2}" stroke-width="3" stroke-linecap="round"/>`}
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${w}" ry="${h}" fill="${c1}"/><path d="M50 ${cy-h} L50 ${cy+h}" stroke="${c2}" stroke-width="2" opacity=".6"/>`+peyes(44,cy-h*.3,2,4.5,boss);break}
+  case'canine':{const w=26*sz,h=13*sz,cy=78;
+   inner+=`<rect x="36" y="${cy+h-16}" width="7" height="18" rx="3" fill="${c2}"/><rect x="58" y="${cy+h-16}" width="7" height="18" rx="3" fill="${c2}"/><rect x="40" y="${cy+h-10}" width="7" height="14" rx="3" fill="${c1}"/><rect x="54" y="${cy+h-10}" width="7" height="14" rx="3" fill="${c1}"/>`;
+   inner+=`<path d="M${50+w*.7} ${cy+2} Q${50+w*1.15} ${cy-8} ${50+w*1.3} ${cy+6}" stroke="${c2}" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${w}" ry="${h}" fill="${c1}"/>`;
+   inner+=`<circle cx="${50-w*.78}" cy="${cy-4}" r="${10*sz}" fill="${c1}"/><path d="M${50-w*.95} ${cy-10} L${50-w*1.1} ${cy-20} L${50-w*.78} ${cy-14}Z M${50-w*.6} ${cy-10} L${50-w*.5} ${cy-20} L${50-w*.42} ${cy-12}Z" fill="${c2}"/>`;
+   inner+=peyes(50-w*.82,cy-6,1,4,boss);break}
+  case'spider':{const r=16*sz,cy=76,hr=7*sz,hy=cy-r-hr*.5;
+   for(let i=0;i<4;i++){const ang=-.9+i*.55;
+    inner+=`<path d="M${50-r*.5} ${cy} Q${50-r*1.4} ${cy-6+i*4} ${50-r*2-i*4} ${cy+i*7-4}" stroke="${c2}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    inner+=`<path d="M${50+r*.5} ${cy} Q${50+r*1.4} ${cy-6+i*4} ${50+r*2+i*4} ${cy+i*7-4}" stroke="${c2}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`}
+   if(traits.tail)inner+=`<path d="M50 ${cy+r*.8} Q${50+r*.3} ${cy+r*1.6} ${50+r*.9} ${cy+r*1.4}" stroke="${c1}" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="${50+r*.9}" cy="${cy+r*1.4}" r="3.4" fill="${c2}"/>`;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${r}" ry="${r*.85}" fill="${c1}"/><circle cx="50" cy="${hy}" r="${hr}" fill="${c1}"/>`+peyes(50,hy,2,3.4,boss);break}
+  case'bat':{const w=13*sz,h=15*sz,cy=72;
+   inner+=`<path d="M${50-w*.6} ${cy-4} Q${50-w*2.2} ${cy-18} ${50-w*2.6} ${cy+2} Q${50-w*1.6} ${cy} ${50-w*1.1} ${cy+10} Q${50-w*.9} ${cy+2} ${50-w*.6} ${cy+6}Z" fill="${c2}"/>`;
+   inner+=`<path d="M${50+w*.6} ${cy-4} Q${50+w*2.2} ${cy-18} ${50+w*2.6} ${cy+2} Q${50+w*1.6} ${cy} ${50+w*1.1} ${cy+10} Q${50+w*.9} ${cy+2} ${50+w*.6} ${cy+6}Z" fill="${c2}"/>`;
+   inner+=`<ellipse cx="50" cy="${cy+h*.3}" rx="${w}" ry="${h}" fill="${c1}"/><path d="M${50-w*.8} ${cy-h*.5} L${50-w*1.1} ${cy-h*1.1} L${50-w*.4} ${cy-h*.6}Z M${50+w*.8} ${cy-h*.5} L${50+w*1.1} ${cy-h*1.1} L${50+w*.4} ${cy-h*.6}Z" fill="${c1}"/>`+peyes(50,cy-h*.1,2,3.6,boss);break}
+  case'humanoid':case'fae':{const robe=traits.robe||traits.type==='fae',hr=13*sz,cy=52+hr,bw=18*sz,bh=36*sz;
+   inner+=`<path d="M${50-6} ${cy+bh*.1} L${50-16} ${cy+bh*.7} M${50+6} ${cy+bh*.1} L${50+16} ${cy+bh*.7}" stroke="${c2}" stroke-width="4" stroke-linecap="round"/>`;
+   if(robe)inner+=`<path d="M${50-bw*.55} ${cy+hr+4} Q50 ${cy+hr} ${50+bw*.55} ${cy+hr+4} L${50+bw} ${cy+bh+hr} Q50 ${cy+bh+hr+8} ${50-bw} ${cy+bh+hr} Z" fill="${c1}"/>`;
+   else inner+=`<rect x="${50-bw*.5}" y="${cy+hr}" width="${bw}" height="${bh}" rx="6" fill="${c1}"/><rect x="${50-bw*.45}" y="${cy+hr+bh-6}" width="${bw*.4}" height="18" rx="3" fill="${c2}"/><rect x="${50+bw*.05}" y="${cy+hr+bh-6}" width="${bw*.4}" height="18" rx="3" fill="${c2}"/>`;
+   if(traits.type==='fae')inner+=`<path d="M${50-10} ${cy-hr+2} Q50 ${cy-hr-10} ${50+10} ${cy-hr+2} Q50 ${cy-hr+8} ${50-10} ${cy-hr+2}Z" fill="${c2}"/>`;
+   inner+=`<circle cx="50" cy="${cy}" r="${hr}" fill="${c1}"/>`+peyes(50,cy-hr*.1,2,3.6,boss);
+   if(traits.crown)inner+=pcrown(50,cy-hr-2);break}
+  case'armored':{const hr=13*sz,cy=52+hr,bw=20*sz,bh=34*sz;
+   inner+=`<rect x="${50-bw*.65}" y="${cy+hr-2}" width="12" height="10" rx="2" fill="${c2}"/><rect x="${50+bw*.65-12}" y="${cy+hr-2}" width="12" height="10" rx="2" fill="${c2}"/>`;
+   inner+=`<rect x="${50-bw*.5}" y="${cy+hr}" width="${bw}" height="${bh}" rx="5" fill="${c1}"/><rect x="${50-bw*.45}" y="${cy+hr+bh-6}" width="${bw*.4}" height="18" rx="3" fill="${c2}"/><rect x="${50+bw*.05}" y="${cy+hr+bh-6}" width="${bw*.4}" height="18" rx="3" fill="${c2}"/>`;
+   inner+=`<path d="M${50+bw*.55} ${cy+hr+6} L${50+bw*.75} ${cy+hr-20}" stroke="${c2}" stroke-width="3.4" stroke-linecap="round"/>`;
+   inner+=`<path d="M${50-hr} ${cy-hr*.1} Q50 ${cy-hr*2.1} ${50+hr} ${cy-hr*.1} L${50+hr*.85} ${cy+hr*.5} Q50 ${cy+hr*.9} ${50-hr*.85} ${cy+hr*.5}Z" fill="${c1}"/>`+peyes(50,cy-hr*.1,2,3.4,boss);
+   if(traits.crown)inner+=pcrown(50,cy-hr*1.7);break}
+  case'golem':{const cy=78,w=23*sz,h=22*sz;
+   inner+=`<rect x="${50-w*.9}" y="${cy+h-6}" width="14" height="16" rx="2" fill="${c2}"/><rect x="${50+w*.9-14}" y="${cy+h-6}" width="14" height="16" rx="2" fill="${c2}"/>`;
+   inner+=`<rect x="${50-w}" y="${cy-h}" width="${w*2}" height="${h*2}" rx="6" fill="${c1}"/><path d="M${50-w*.5} ${cy-h*.6} L${50-w*.2} ${cy+h*.2} L${50+w*.3} ${cy-h*.1}" stroke="${c2}" stroke-width="2" fill="none" opacity=".7"/>`;
+   inner+=`<rect x="${50-w*.5}" y="${cy-h*1.7}" width="${w}" height="${h*.8}" rx="4" fill="${c1}"/>`+peyes(50,cy-h*1.35,2,4,boss);
+   if(traits.crown)inner+=pcrown(50,cy-h*1.7-4);break}
+  case'ogre':{const cy=76,w=30*sz,h=26*sz;
+   inner+=`<path d="M${50+w*.8} ${cy+h*.3} L${50+w*1.3} ${cy-h*.5} L${50+w*1.15} ${cy+h*.6}Z" fill="${c2}"/>`;
+   inner+=`<rect x="${50-w*.55}" y="${cy+h-10}" width="16" height="20" rx="4" fill="${c2}"/><rect x="${50+w*.55-16}" y="${cy+h-10}" width="16" height="20" rx="4" fill="${c2}"/>`;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${w}" ry="${h}" fill="${c1}"/><circle cx="50" cy="${cy-h*1.15}" r="${13*sz}" fill="${c1}"/>`+peyes(50,cy-h*1.2,2,3.6,boss);
+   if(traits.crown)inner+=pcrown(50,cy-h*1.5);break}
+  case'dragon':{const cy=85,w=16*sz,h=12*sz;
+   inner+=`<path d="M${50-w*1.3} ${cy-4} Q${50-w*3} ${cy-16} ${50-w*3.6} ${cy+4} Q${50-w*2} ${cy+2} ${50-w*1.3} ${cy+8}Z M${50+w*1.3} ${cy-4} Q${50+w*3} ${cy-16} ${50+w*3.6} ${cy+4} Q${50+w*2} ${cy+2} ${50+w*1.3} ${cy+8}Z" fill="${c2}"/>`;
+   inner+=`<path d="M${50+w*.8} ${cy} Q${50+w*2} ${cy+16} ${50+w*1.3} ${cy+24}" stroke="${c1}" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+   inner+=`<rect x="${50-w*.6}" y="${cy+h-10}" width="8" height="14" rx="3" fill="${c2}"/><rect x="${50+w*.6-8}" y="${cy+h-10}" width="8" height="14" rx="3" fill="${c2}"/>`;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${w}" ry="${h}" fill="${c1}"/>`;
+   inner+=`<path d="M50 ${cy-h*.8} Q${50-w*.3} ${cy-h*2.4} ${50-w*.1} ${cy-h*3}" stroke="${c1}" stroke-width="${9*sz}" fill="none" stroke-linecap="round"/>`;
+   const hx=50-w*.1,hy=cy-h*3;inner+=`<circle cx="${hx}" cy="${hy}" r="${9*sz}" fill="${c1}"/><path d="M${hx-6} ${hy-6} L${hx-10} ${hy-16} L${hx-2} ${hy-10}Z M${hx+6} ${hy-6} L${hx+10} ${hy-16} L${hx+2} ${hy-10}Z" fill="#e8dcc0"/>`+peyes(hx,hy,2,3,boss);break}
+  case'ghost':{const w=23*sz,cy=66,topY=cy-32*sz,midY=cy-4*sz,hemY=cy+26*sz;
+   let d=`M${(50-w).toFixed(1)} ${midY.toFixed(1)} Q${(50-w).toFixed(1)} ${topY.toFixed(1)} 50 ${topY.toFixed(1)} Q${(50+w).toFixed(1)} ${topY.toFixed(1)} ${(50+w).toFixed(1)} ${midY.toFixed(1)} L${(50+w).toFixed(1)} ${hemY.toFixed(1)}`;
+   const teeth=4;for(let i=1;i<=teeth;i++){const x=50+w-i*(2*w/teeth),dipY=i%2?hemY+9*sz:hemY;d+=` L${x.toFixed(1)} ${dipY.toFixed(1)}`}
+   d+=' Z';
+   inner+=`<path d="${d}" fill="${c1}" opacity=".9"/>`;
+   if(traits.crown)inner+=pcrown(50,topY-2);
+   inner+=peyes(50,cy-2*sz,2,4.2,boss);break}
+  case'bird':{const w=15*sz,h=12*sz,cy=78;
+   inner+=`<path d="M${50-w*.5} ${cy-h*.5} Q${50-w*2.6} ${cy-h*2} ${50-w*3.2} ${cy} Q${50-w*1.8} ${cy-h*.2} ${50-w*.8} ${cy+h*.4}Z" fill="${c2}"/>`;
+   inner+=`<path d="M${50+w*.5} ${cy-h*.5} Q${50+w*2.6} ${cy-h*2} ${50+w*3.2} ${cy} Q${50+w*1.8} ${cy-h*.2} ${50+w*.8} ${cy+h*.4}Z" fill="${c2}"/>`;
+   inner+=`<path d="M${50-2} ${cy+h+6} L${50-6} ${cy+h+16} M${50+2} ${cy+h+6} L${50+6} ${cy+h+16}" stroke="${c2}" stroke-width="2.6" stroke-linecap="round"/>`;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${w}" ry="${h}" fill="${c1}"/><path d="M${50-w} ${cy-2} L${50-w-9} ${cy} L${50-w} ${cy+4}Z" fill="#ffb02e"/>`+peyes(50-w*.3,cy-h*.2,1,3.6,boss);
+   if(traits.crown)inner+=pcrown(50,cy-h*1.9);break}
+  case'tree':{const cy=90,trh=28*sz,cr=24*sz;
+   inner+=`<path d="M50 ${cy-trh*.3} Q${50-20} ${cy-trh*.5} ${50-26} ${cy-trh*.2} M50 ${cy-trh*.5} Q${50+20} ${cy-trh*.7} ${50+26} ${cy-trh*.4}" stroke="${c1}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+   inner+=`<rect x="${50-6}" y="${cy-trh}" width="12" height="${trh+14}" rx="4" fill="${c1}"/>`;
+   inner+=`<circle cx="50" cy="${cy-trh-cr*.6}" r="${cr}" fill="${c2}"/><circle cx="${50-cr*.7}" cy="${cy-trh-cr*.2}" r="${cr*.7}" fill="${c2}"/><circle cx="${50+cr*.7}" cy="${cy-trh-cr*.2}" r="${cr*.7}" fill="${c2}"/>`+peyes(50,cy-trh-cr*.5,2,3.6,boss);break}
+  case'serpent':{const r=9*sz;
+   inner+=`<path d="M22 92 Q40 60 50 70 Q60 80 78 48" stroke="${c1}" stroke-width="${r*2}" fill="none" stroke-linecap="round"/>`;
+   inner+=`<circle cx="78" cy="48" r="${r+3}" fill="${c1}"/>`+peyes(78,46,2,3,boss);
+   inner+=`<path d="M22 92 L14 98 M22 92 L18 100" stroke="${c2}" stroke-width="2" stroke-linecap="round"/>`;break}
+  case'eye':{const r=22*sz,cy=72;
+   for(let i=0;i<6;i++){const ang=i*Math.PI/3,x=50+Math.cos(ang)*r*1.6,y=cy+Math.sin(ang)*r*1.6;inner+=`<path d="M50 ${cy} Q${(50+x)/2} ${(cy+y)/2-10} ${x.toFixed(0)} ${y.toFixed(0)}" stroke="${c2}" stroke-width="2.2" fill="none" opacity=".6"/>`}
+   inner+=`<circle cx="50" cy="${cy}" r="${r}" fill="#fff"/><circle cx="50" cy="${cy}" r="${r*.62}" fill="${c1}"/><circle cx="50" cy="${cy}" r="${r*.28}" fill="#000"/>`;
+   if(traits.maw)inner+=`<path d="M${50-r*.8} ${cy+r*.7} L${50-r*.5} ${cy+r*1.2} L${50-r*.2} ${cy+r*.7} L50 ${cy+r*1.2} L${50+r*.2} ${cy+r*.7} L${50+r*.5} ${cy+r*1.2} L${50+r*.8} ${cy+r*.7}" stroke="#fff" stroke-width="2" fill="none"/>`;
+   if(traits.crown)inner+=pcrown(50,cy-r-6);break}
+  case'kraken':{const cy=58,r=18*sz;
+   for(let i=0;i<5;i++){const x=50+(i-2)*12;inner+=`<path d="M${x} ${cy+r*.6} Q${x+(i-2)*6} ${cy+r*2} ${x+(i-2)*10} ${cy+r*3}" stroke="${c1}" stroke-width="7" fill="none" stroke-linecap="round"/><circle cx="${x+(i-2)*10}" cy="${cy+r*3}" r="3" fill="${c2}"/>`}
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${r*1.3}" ry="${r}" fill="${c1}"/>`+peyes(50,cy-r*.2,2,4.4,boss);break}
+  case'phoenix':{const w=15*sz,h=12*sz,cy=76;
+   inner+=`<path d="M${50-w*.5} ${cy-h*.5} Q${50-w*2.4} ${cy-h*1.6} ${50-w*3.4} ${cy-h*1.8} Q${50-w*2.6} ${cy-h*.4} ${50-w*3.6} ${cy+h*.2} Q${50-w*2} ${cy} ${50-w*.8} ${cy+h*.4}Z" fill="${c2}"/>`;
+   inner+=`<path d="M${50+w*.5} ${cy-h*.5} Q${50+w*2.4} ${cy-h*1.6} ${50+w*3.4} ${cy-h*1.8} Q${50+w*2.6} ${cy-h*.4} ${50+w*3.6} ${cy+h*.2} Q${50+w*2} ${cy} ${50+w*.8} ${cy+h*.4}Z" fill="${c2}"/>`;
+   inner+=`<path d="M50 ${cy+h} Q${50-6} ${cy+h+16} 50 ${cy+h+26} Q${50+6} ${cy+h+16} 50 ${cy+h}Z" fill="${c1}"/>`;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${w}" ry="${h}" fill="${c1}"/><path d="M${50-w} ${cy-2} L${50-w-9} ${cy} L${50-w} ${cy+4}Z" fill="#ffd700"/>`+peyes(50-w*.3,cy-h*.2,1,3.6,boss);break}
+  case'hydra':{const cy=82,r=15*sz;
+   inner+=`<ellipse cx="50" cy="${cy}" rx="${r*1.4}" ry="${r}" fill="${c1}"/>`;
+   [-16,0,16].forEach((dx,i)=>{const hx=50+dx,hy=cy-r-18-(i===1?8:0);
+    inner+=`<path d="M${50+dx*.4} ${cy-r*.4} Q${hx} ${cy-r-6} ${hx} ${hy}" stroke="${c1}" stroke-width="${8*sz}" fill="none" stroke-linecap="round"/><circle cx="${hx}" cy="${hy}" r="${7*sz}" fill="${c1}"/>`+peyes(hx,hy,1,3,boss)});break}
+  default: return monsterArtBlob(name,{mon:[c1,c2]},boss,flip);
+ }
+ return`<svg class="art fig${flip?' flip':''}" viewBox="0 0 100 120">${inner}</svg>`}
+function monsterArt(name,z,boss,flip){const key=(boss?'boss:':'enemy:')+z.id;if(CFG.img[key])return imgTag(CFG.img[key],flip);
+ const traits=MONSTER_TRAITS[name];
+ if(traits)return creatureSVG(traits,name,boss,flip);
+ return monsterArtBlob(name,z,boss,flip)}
 function itemShape(it){const nm=it.name.toLowerCase(),names=SLOTS[it.slot].names;const idx=names.findIndex(n=>nm.includes(n.toLowerCase()));return idx<0?0:idx}
 function itemArt(it){const shape=itemShape(it),key='item:'+it.slot+':'+shape;if(CFG.img[key])return imgTag(CFG.img[key]).replace('class="art fig"','class="ithumb"');
  const col=RAR[it.r].c,g=gid();let inner='';
