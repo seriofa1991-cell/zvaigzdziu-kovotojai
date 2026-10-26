@@ -753,16 +753,19 @@ function accSave(a){try{localStorage.setItem(ACC_KEY,JSON.stringify(a))}catch(e)
 const userSaveKey=u=>'zk_v1_'+u;
 const GUILD_ICOS=['🏰','⚔️','🛡️','🔥','❄️','🐉','🌟','🦅'];
 const GUILD_COST=500;
-const GUILD_RESET_V=1; // keliamas skaičius = visų gildijų iždas/lygis atstatomas iš naujo
-function guildLevel(g){return Math.max(1,g.builtLvl||1)}
+const GUILD_RESET_V=2; // keliamas skaičius = visų gildijų iždas/lygiai atstatomi iš naujo
+const GUILD_TRACK_IDS=['atk','def','trade','sci'];
+function trackLevel(g,id){return Math.max(1,(g.tracks&&g.tracks[id])||1)}
+function guildAvgLevel(g){const s=GUILD_TRACK_IDS.reduce((a,id)=>a+trackLevel(g,id),0);return s/GUILD_TRACK_IDS.length}
+function guildLevel(g){return Math.max(1,Math.floor(guildAvgLevel(g)))}
 function guildUpgradeCost(lvl){return 300*lvl*lvl}
 function guildResetIfNeeded(g,id){if((g.resetV||0)>=GUILD_RESET_V)return g;
- g.treasury=0;g.builtLvl=1;g.resetV=GUILD_RESET_V;
+ g.treasury=0;g.tracks={atk:1,def:1,trade:1,sci:1};g.resetV=GUILD_RESET_V;
  if(g.members)for(const k in g.members)if(g.members[k])g.members[k].contrib=0;
  if(fbOK&&id)fbDb.collection('guilds').doc(id).set(g).catch(()=>{});
  return g}
 let GUILD_CACHE={},GUILD_LIST_CACHE=null,_guildFetchAt=0;
-function guildBonus(p){if(!p.guild)return 0;const g=GUILD_CACHE[p.guild];if(!g)return 0;return Math.min(.15,guildLevel(g)*.02)}
+function guildBonus(p){if(!p.guild)return 0;const g=GUILD_CACHE[p.guild];if(!g)return 0;return Math.min(.15,guildAvgLevel(g)*.02)}
 function refreshGuildCache(id){if(!fbOK||!id)return Promise.resolve();
  return fbDb.collection('guilds').doc(id).get().then(snap=>{
   if(!snap.exists){delete GUILD_CACHE[id];return}
@@ -801,7 +804,7 @@ async function guildCreateAsync(name,ico){name=(name||'').trim();
  const dup=await fbDb.collection('guilds').where('name','==',name).limit(1).get().catch(()=>null);
  if(dup&&!dup.empty)return{err:'Tokia gildija jau egzistuoja.'};
  const ref=fbDb.collection('guilds').doc();
- const doc={id:ref.id,name,ico:GUILD_ICOS.includes(ico)?ico:GUILD_ICOS[0],founder:USER,created:Date.now(),treasury:0,builtLvl:1,resetV:GUILD_RESET_V,members:{[USER]:{role:'founder',joined:Date.now(),contrib:0}}};
+ const doc={id:ref.id,name,ico:GUILD_ICOS.includes(ico)?ico:GUILD_ICOS[0],founder:USER,created:Date.now(),treasury:0,tracks:{atk:1,def:1,trade:1,sci:1},resetV:GUILD_RESET_V,members:{[USER]:{role:'founder',joined:Date.now(),contrib:0}}};
  try{await ref.set(doc)}catch(e){return{err:'Nepavyko sukurti gildijos.'}}
  S.zen-=GUILD_COST;S.guild=ref.id;GUILD_CACHE[ref.id]=doc;save();return{ok:1,id:ref.id}}
 async function guildJoinAsync(id){
@@ -827,15 +830,16 @@ async function guildDonateAsync(amt){amt=Math.floor(amt);
  const ref=fbDb.collection('guilds').doc(S.guild);
  try{await ref.update({treasury:firebase.firestore.FieldValue.increment(amt),['members.'+USER+'.contrib']:firebase.firestore.FieldValue.increment(amt)})}catch(e){return{err:'Nepavyko paaukoti.'}}
  S.zen-=amt;await refreshGuildCache(S.guild);save();return{ok:1,amt}}
-async function guildUpgradeAsync(){
+async function guildUpgradeAsync(trackId){
  if(!S.guild)return{err:'Nesi gildijoje.'};
+ if(!GUILD_TRACK_IDS.includes(trackId))return{err:'Nežinoma sritis.'};
  const g=GUILD_CACHE[S.guild];if(!g)return{err:'Gildija dar nepakrauta.'};
  if(g.founder!==USER)return{err:'Tik gildijos įkūrėjas gali kelti pastato lygį.'};
- const lvl=guildLevel(g),cost=guildUpgradeCost(lvl);
+ const lvl=trackLevel(g,trackId),cost=guildUpgradeCost(lvl);
  if((g.treasury||0)<cost)return{err:'Iždui trūksta '+fmt(cost-(g.treasury||0))+' 🪙.'};
  if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
  const ref=fbDb.collection('guilds').doc(S.guild);
- try{await ref.update({treasury:firebase.firestore.FieldValue.increment(-cost),builtLvl:firebase.firestore.FieldValue.increment(1)})}catch(e){return{err:'Nepavyko atnaujinti.'}}
+ try{await ref.update({treasury:firebase.firestore.FieldValue.increment(-cost),['tracks.'+trackId]:firebase.firestore.FieldValue.increment(1)})}catch(e){return{err:'Nepavyko atnaujinti.'}}
  await refreshGuildCache(S.guild);return{ok:1,lvl:lvl+1}}
 async function guildDonateItemAsync(id){
  if(!S.guild)return{err:'Nesi gildijoje.'};
@@ -1316,7 +1320,7 @@ function playtimeStr(ms){const h=Math.floor(ms/3600000),d=Math.floor(h/24);if(d>
 function statsCard(){const total=S.wins+S.losses,wr=total?Math.round(S.wins/total*100):0,atotal=S.arenaW+S.arenaL,awr=atotal?Math.round(S.arenaW/atotal*100):0;
  const rows=[['⏱️ Žaidimo laikas',playtimeStr(Date.now()-S.created)],['⚔️ Kovų iš viso',fmt(total)+' ('+wr+'% pergalių)'],['👑 Nugalėti bosai',fmt(S.bosses)],['🏟️ Arenos kovų',fmt(atotal)+' ('+awr+'% pergalių)'],['💎 Surinkti rinkiniai',fmt(S.sets)],['🟨 Rasti legendiniai',fmt(S.legends)],['🐾 Palydovų',S.comp.owned.length+'/'+COMPANIONS.length],['🎖️ Pasiekimų',Object.keys(S.ach).length+'/'+ACH.length],['📅 Dovanų serija',fmt(S.daily.streak)+' d.'],['🔁 Veiksmų',fmt(S.actions)]];
  return`<div class="card"><h2>📊 Statistika</h2>${rows.map(([l,v])=>`<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="mut">${l}</span><b>${v}</b></div>`).join('')}</div>`}
-const GUILD_TRACKS=[{ico:'⚔️',n:'Puolimo mokslas'},{ico:'🛡️',n:'Gynybos mokslas'},{ico:'💰',n:'Prekybos kelias'},{ico:'📜',n:'Mokslo centras'}];
+const GUILD_TRACKS=[{id:'atk',ico:'⚔️',n:'Puolimo mokslas'},{id:'def',ico:'🛡️',n:'Gynybos mokslas'},{id:'trade',ico:'💰',n:'Prekybos kelias'},{id:'sci',ico:'📜',n:'Mokslo centras'}];
 function guildCard(){
  if(S.guild){const g=GUILD_CACHE[S.guild];
   if(!g)return`<div class="card"><h2>🏰 Gildija</h2><p class="mut">⏳ Kraunama...</p></div>`;
@@ -1327,16 +1331,17 @@ function guildCard(){
    return`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b>${esc(nm)}</b>${m.uk===g.founder?' <span class="tag gold">👑 Įkūrėjas</span>':''}${m.uk===USER?' <span class="tag ok">Tu</span>':''}${lite&&!lite.hidden?` <span class="mut">· lyg. ${lite.lvl} · ⚡${fmt(lite.power)}</span>`:lite&&lite.hidden?' <span class="mut">· 🔒 paslėptas</span>':''}</div><span class="mut">${fmt(m.contrib||0)} 🪙</span></div>`}).join('');
   const invRows=S.inv.slice(0,12).map(it=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)">${itemArt(it)}<div style="flex:1;min-width:0">${itemLine(it)}</div><button class="sm" data-act="guilddonateitem" data-arg="${it.id}">💰 ${fmt(Math.round(RAR[it.r].sell*(1+it.lv/10)))}</button></div>`).join('');
   const leaderLite=readUserLite(g.founder,USER),leaderName=leaderLite?leaderLite.name:g.founder;
-  const isFounder=g.founder===USER,upCost=guildUpgradeCost(lvl),prog=clamp((g.treasury||0)/upCost*100,0,100),canUp=(g.treasury||0)>=upCost;
-  const tracks=GUILD_TRACKS.map(t=>`<div class="row2" style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="font-size:22px;flex:none">${t.ico}</div><div style="flex:1;min-width:0"><b style="font-size:14px">${t.n}</b><div class="bar" style="margin-top:4px"><i style="width:${prog}%"></i></div></div><span class="tag gold" style="flex:none">Lyg. ${lvl}</span></div>`).join('');
+  const isFounder=g.founder===USER;
+  const tracks=GUILD_TRACKS.map(t=>{const tl=trackLevel(g,t.id),cost=guildUpgradeCost(tl),prog=clamp((g.treasury||0)/cost*100,0,100),canUp=(g.treasury||0)>=cost;
+   return`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><div class="row2"><div style="font-size:22px;flex:none">${t.ico}</div><div style="flex:1;min-width:0"><b style="font-size:14px">${t.n}</b><div class="bar" style="margin-top:4px"><i style="width:${prog}%"></i></div></div><span class="tag gold" style="flex:none">Lyg. ${tl}</span></div>
+   ${isFounder?`<button class="sm pri" style="margin-top:6px" data-act="guildupgrade" data-arg="${t.id}" ${canUp?'':'disabled'}>⬆️ Kelti (${fmt(cost)} 🪙)</button>`:''}</div>`}).join('');
   return`<div class="card"><div class="row2" style="align-items:flex-start">
   <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-size:30px;flex:none">${g.ico}</div>
   <div style="flex:1;min-width:0"><h1 style="margin:0;font-size:19px">${esc(g.name)}</h1><p class="mut" style="margin:4px 0 0">👑 Lyderis: ${esc(leaderName)}</p>
   <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap;justify-content:flex-start"><span class="tag gold">⚡ Galia ${fmt(totalPower)}${knownAll?'':'+'}</span><span class="tag">👥 ${mkeys.length}/30</span><span class="tag">🏛️ Lyg. ${lvl}</span></div></div></div>
   <p class="mut" style="margin:10px 0 0">Iždas: ${fmt(g.treasury||0)} 🪙 · Bonusas visiems nariams: +${bonus}% monetų ir patirties iš kovų</p>
   <h2 style="margin:14px 0 2px">🏛️ Gildijos vystymas</h2>${tracks}
-  <p class="mut" style="margin:6px 0 0">Iki kito lygio: ${fmt(Math.max(0,upCost-(g.treasury||0)))} 🪙${isFounder?'':' (lygį gali kelti tik įkūrėjas)'}</p>
-  ${isFounder?`<button class="sm pri" style="margin-top:6px" data-act="guildupgrade" ${canUp?'':'disabled'}>⬆️ Kelti pastato lygį (${fmt(upCost)} 🪙)</button>`:''}
+  ${isFounder?'':'<p class="mut" style="margin:6px 0 0">Pastatų lygį gali kelti tik gildijos įkūrėjas.</p>'}
   <h2 style="margin:14px 0 2px">👥 Nariai</h2>${members}
   <div class="row" style="margin-top:10px;gap:6px"><input id="gdon" type="number" min="1" placeholder="Suma" style="flex:1"><button class="sm pri" data-act="guilddonate">💰 Aukoti monetų</button></div>
   <p class="mut" style="margin:10px 0 4px"><b>Aukoti daiktą iš kuprinės (papildo iždą):</b></p>
@@ -1635,7 +1640,7 @@ function act(a,arg,btn){
  if(a==='guildleave'){guildLeaveAsync().then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🚪 Palikai gildiją.');render()});return}
  if(a==='guilddonate'){const v=parseInt((($('#gdon')||{}).value)||'0',10);guildDonateAsync(v).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Paaukota '+fmt(r.amt)+' 🪙 į iždą');Snd.play('coin');render()});return}
  if(a==='guilddonateitem'){guildDonateItemAsync(+arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Daiktas paaukotas (+'+fmt(r.val)+' 🪙 į iždą)');Snd.play('coin');render()});return}
- if(a==='guildupgrade'){toast('⏳ Keliamas lygis...');guildUpgradeAsync().then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🏛️ Pastato lygis pakeltas iki '+r.lvl+'!');Snd.play('lvl');render()});return}
+ if(a==='guildupgrade'){toast('⏳ Keliamas lygis...');guildUpgradeAsync(arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🏛️ Lygis pakeltas iki '+r.lvl+'!');Snd.play('lvl');render()});return}
  if(a==='togglepublic'){const r=Server.togglePublic(S);toast(r.pub?'👁️ Profilis vieša':'🔒 Profilis paslėptas');save();render();return}
  if(a==='friendadd'){const n=($('#fname')||{}).value;toast('⏳ Tikrinama...');friendAddAsync(n).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🤝 Draugas pridėtas');render()});return}
  if(a==='friendremove'){Server.friendRemove(S,arg);save();render();return}
