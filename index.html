@@ -189,6 +189,7 @@ const ZONES=[
  {id:'amzina',ico:'🏛️',name:'Amžinybės sostas',lvl:62,en:['Amžinybės sargas','Laiko fantomas','Sostų šešėlis'],boss:'Paskutinis Valdovas',pal:['#1a0a2e','#3a1a5e','#5a2a8e','#2a0a4e','#120522','#ffd700'],mon:['#8a5aff','#d4af37','#5a2a8e']}
 ];
 const ZONE_IMG={pievos:'img/zone/pievos.webp',miskas:'img/zone/miskas.webp',dykuma:'img/zone/dykuma.webp',ugnikalnis:'img/zone/ugnikalnis.webp',urvai:'img/zone/urvai.webp',debesys:'img/zone/debesys.webp',arena:'img/zone/arena.webp',tustuma:'img/zone/tustuma.webp',amzina:'img/zone/amzina.webp'};
+const RACE_IMG={ugnis:'img/race/ugnis.webp',zemes:'img/race/zemes.webp',ledo:'img/race/ledo.webp',seselio:'img/race/seselio.webp',mech:'img/race/mech.webp',sviesos:'img/race/sviesos.webp'};
 const OPTS=[{k:'Lengvas',off:-2},{k:'Lygus',off:0},{k:'Sunkus',off:1},{k:'BOSAS',off:3,boss:true}];
 const ENEMY_SCALE=.95;
 const zoneForLevel=lvl=>{for(let i=ZONES.length-1;i>=0;i--)if(lvl>=ZONES[i].lvl)return i;return 0};
@@ -1017,7 +1018,7 @@ function zoneArt(z){if(ZONE_IMG[z.id])return imgTag(ZONE_IMG[z.id]);if(CFG.img['
  for(let i=0;i<16;i++)st+=`<circle cx="${(R()*400)|0}" cy="${(R()*55)|0}" r="${(R()*1.3+.3).toFixed(1)}" fill="#fff" opacity="${(R()*.6+.15).toFixed(2)}"/>`;
  [a,b,c].forEach((col,li)=>{let pts='0,120 ';const bs=58+li*20,amp=34-li*8;for(let x=0;x<=400;x+=20)pts+=x+','+(bs-R()*amp).toFixed(0)+' ';m+=`<polygon points="${pts}400,120" fill="${col}"/>`});
  return`<svg class="art" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s1}"/><stop offset="1" stop-color="${s2}"/></linearGradient></defs><rect width="400" height="120" fill="url(#${g})"/>${st}<circle cx="${(290+R()*70)|0}" cy="30" r="22" fill="${sun}" opacity=".25"/><circle cx="${(290+R()*70)|0}" cy="30" r="15" fill="${sun}" opacity=".9"/>${m}</svg>`}
-function fighterArt(rk,flip){if(CFG.img['race:'+rk])return imgTag(CFG.img['race:'+rk],flip);
+function fighterArt(rk,flip){if(RACE_IMG[rk])return imgTag(RACE_IMG[rk],flip);if(CFG.img['race:'+rk])return imgTag(CFG.img['race:'+rk],flip);
  const c=RACES[rk].col,g=gid();
  const hair={ugnis:`<path d="M31 32 L35 6 L43 22 L50 0 L57 22 L65 6 L69 32 Q50 20 31 32Z" fill="${c[1]}"/>`,
   zemes:`<path d="M32 36 Q30 12 50 14 Q70 12 68 36 Q62 22 50 24 Q38 22 32 36Z" fill="${c[1]}"/>`,
@@ -1649,11 +1650,11 @@ function tabAdmin(){
  <div class="card"><h2>Konfigūracija</h2><div class="grid g2"><button data-act="aexp">📤 Eksportuoti</button><button data-act="aimp">📥 Importuoti</button></div><div style="margin-top:8px"><button data-act="adef" style="color:var(--bad)">↺ Atstatyti numatytuosius</button></div></div>
  <div class="grid g2"><button data-act="tab" data-arg="${S?'prof':'kova'}">← Atgal</button><button data-act="alogout">🚪 Atsijungti</button></div>`}
 function tabAuth(){const mode=ui.authMode||'login',isLogin=mode==='login';
- return banner()+`<div class="zonebn" style="height:140px">${zoneArt(ZONES[6])}<div class="lbl" style="font-size:24px"><img src="img/logo/icon.svg" alt="" style="width:30px;height:30px;vertical-align:-7px;margin-right:6px">Žvaigždžių Kovotojai<small>Naršyklinis kovų RPG · 9 zonos · 5 rasės</small></div></div>
+ return banner()+`<div class="zonebn" style="height:140px">${zoneArt(ZONES[6])}<div class="lbl" style="font-size:24px"><img src="img/logo/icon.svg" alt="" style="width:30px;height:30px;vertical-align:-7px;margin-right:6px">Žvaigždžių Kovotojai<small>Naršyklinis kovų RPG · 9 zonos · 6 rasės</small></div></div>
  <div class="card">
  <h2 style="margin-top:0">Apie žaidimą</h2>
- <p style="margin-top:0">Naršyklinis kovų RPG lietuviškai. Pasirink vieną iš 5 rasių, kovok su monstrais ir bosais 8 skirtingose zonose, rink legendinius daiktus ir runas, auklėk palydovus ir kopk reitinge arenoje. <span class="ok">Registracija ONLINE.</span></p>
- <div class="mut">⚔️ 9 zonos — nuo Aušros pievų iki Amžinybės sosto<br>🧝 5 unikalios rasės su savo kovos įgūdžiais<br>🏟️ Arena, savaitės iššūkiai, bosų maratonas, požemiai<br>🎒 Daiktai, runos, amatai, palydovai, miestas ir ūkis</div>
+ <p style="margin-top:0">Naršyklinis kovų RPG lietuviškai. Pasirink vieną iš 6 rasių, kovok su monstrais ir bosais 9 skirtingose zonose, rink legendinius daiktus ir runas, auklėk palydovus ir kopk reitinge arenoje. <span class="ok">Registracija ONLINE.</span></p>
+ <div class="mut">⚔️ 9 zonos — nuo Aušros pievų iki Amžinybės sosto<br>🧝 6 unikalios rasės su savo kovos įgūdžiais<br>🏟️ Arena, savaitės iššūkiai, bosų maratonas, požemiai<br>🎒 Daiktai, runos, amatai, palydovai, miestas ir ūkis</div>
  </div>
  <div class="card">
  <div class="chips" style="margin-bottom:12px"><button class="${isLogin?'sel':''}" data-act="authmode" data-arg="login">Prisijungti</button><button class="${!isLogin?'sel':''}" data-act="authmode" data-arg="register">Registruotis</button></div>
@@ -1670,7 +1671,7 @@ function authFooter(){return`<div class="card"><h2 style="margin-top:0">🍪 Sla
  <div class="card"><h2 style="margin-top:0">📞 Kontaktai</h2><p class="mut" style="margin:0 0 6px">Klausimai, pasiūlymai ar pastebėjai klaidą? Rašyk:</p><p style="margin:0">✉️ <a href="mailto:seriofa1991@gmail.com" style="color:var(--acc)">seriofa1991@gmail.com</a></p><p style="margin:4px 0 0">💬 Telegram: <a href="https://t.me/SergejK0" target="_blank" rel="noopener" style="color:var(--acc)">@SergejK0</a></p></div>
  <p class="mut" style="text-align:center;margin:12px 0"><img src="img/logo/icon.svg" alt="" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px">Žvaigždžių Kovotojai — nepriklausomas projektas, kurtas vieno kūrėjo.</p>`}
 function tabCreate(){const rs=Object.keys(RACES).map(k=>{const r=RACES[k];return`<button class="${ui.race===k?'sel':''}" data-act="race" data-arg="${k}"><div class="row2"><div class="thumb">${fighterArt(k)}</div><div style="flex:1;min-width:0"><div class="row"><b>${r.ico} ${r.name}</b><span class="tag">${r.tag}</span></div><div class="mut">${r.desc}</div><div class="ok" style="font-size:13px">${r.perk}</div></div></div></button>`}).join('');
- return banner()+`<div class="zonebn" style="height:140px">${zoneArt(ZONES[6])}<div class="lbl" style="font-size:24px"><img src="img/logo/icon.svg" alt="" style="width:30px;height:30px;vertical-align:-7px;margin-right:6px">Žvaigždžių Kovotojai<small>Naršyklinis kovų RPG · 9 zonos · 5 rasės</small></div></div>
+ return banner()+`<div class="zonebn" style="height:140px">${zoneArt(ZONES[6])}<div class="lbl" style="font-size:24px"><img src="img/logo/icon.svg" alt="" style="width:30px;height:30px;vertical-align:-7px;margin-right:6px">Žvaigždžių Kovotojai<small>Naršyklinis kovų RPG · 9 zonos · 6 rasės</small></div></div>
  <div class="card"><h2>Kovotojo vardas</h2><input id="nm" maxlength="16" placeholder="Įvesk vardą" value="${esc(ui.name)}" autocomplete="off"></div><h2>Pasirink rasę</h2><div class="grid" style="margin-bottom:12px">${rs}</div><button class="pri" data-act="create">Pradėti kovą</button>
  <div style="margin-top:16px;text-align:center"><button class="sm" data-act="tab" data-arg="admin" style="background:none;border:0;color:var(--mut)">🛠️ Admin</button></div>`}
 
