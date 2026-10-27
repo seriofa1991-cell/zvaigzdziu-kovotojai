@@ -188,6 +188,7 @@ const ZONES=[
  {id:'tustuma',ico:'🕳️',name:'Tuštumos riba',lvl:55,en:['Tuštumos šešėlis','Laiko ryjikas','Bedugnės akis'],boss:'Pirmapradis Chaosas',pal:['#000000','#1a0a1a','#2a0a2a','#1a051a','#0a020a','#ff3060'],mon:['#6a2a6a','#3a3a6a','#9a1a4a']},
  {id:'amzina',ico:'🏛️',name:'Amžinybės sostas',lvl:62,en:['Amžinybės sargas','Laiko fantomas','Sostų šešėlis'],boss:'Paskutinis Valdovas',pal:['#1a0a2e','#3a1a5e','#5a2a8e','#2a0a4e','#120522','#ffd700'],mon:['#8a5aff','#d4af37','#5a2a8e']}
 ];
+const ZONE_IMG={pievos:'img/zone/pievos.webp',miskas:'img/zone/miskas.webp',dykuma:'img/zone/dykuma.webp',ugnikalnis:'img/zone/ugnikalnis.webp',urvai:'img/zone/urvai.webp',debesys:'img/zone/debesys.webp',arena:'img/zone/arena.webp',tustuma:'img/zone/tustuma.webp',amzina:'img/zone/amzina.webp'};
 const OPTS=[{k:'Lengvas',off:-2},{k:'Lygus',off:0},{k:'Sunkus',off:1},{k:'BOSAS',off:3,boss:true}];
 const ENEMY_SCALE=.95;
 const zoneForLevel=lvl=>{for(let i=ZONES.length-1;i>=0;i--)if(lvl>=ZONES[i].lvl)return i;return 0};
@@ -1011,7 +1012,7 @@ const FX={
 /* ---------- ILIUSTRACIJOS (originalios SVG, generuojamos kode) ---------- */
 const gid=()=>'g'+(++gidn);
 const imgTag=(u,flip)=>`<img class="art fig${flip?' flip':''}" src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer">`;
-function zoneArt(z){if(CFG.img['zone:'+z.id])return imgTag(CFG.img['zone:'+z.id]);
+function zoneArt(z){if(ZONE_IMG[z.id])return imgTag(ZONE_IMG[z.id]);if(CFG.img['zone:'+z.id])return imgTag(CFG.img['zone:'+z.id]);
  const R=rng(hash(z.id)),g=gid(),[s1,s2,a,b,c,sun]=z.pal;let m='',st='';
  for(let i=0;i<16;i++)st+=`<circle cx="${(R()*400)|0}" cy="${(R()*55)|0}" r="${(R()*1.3+.3).toFixed(1)}" fill="#fff" opacity="${(R()*.6+.15).toFixed(2)}"/>`;
  [a,b,c].forEach((col,li)=>{let pts='0,120 ';const bs=58+li*20,amp=34-li*8;for(let x=0;x<=400;x+=20)pts+=x+','+(bs-R()*amp).toFixed(0)+' ';m+=`<polygon points="${pts}400,120" fill="${col}"/>`});
