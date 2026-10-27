@@ -219,7 +219,7 @@ const RAR=[{n:'Paprastas',m:1,c:'#9aa3b2',w:70,sell:3},{n:'Retas',m:1.6,c:'#4aa3
 const SLOTS={weapon:{n:'Ginklas',ico:'🗡️',names:['Kardas','Kirvis','Ietis','Plaktukas']},armor:{n:'Šarvai',ico:'🛡️',names:['Šarvai','Šalmas','Skydas','Apsiaustas']},charm:{n:'Amuletas',ico:'📿',names:['Amuletas','Žiedas','Talismanas']}};
 const PRE=['Žaibo','Šešėlio','Žvaigždžių','Geležies','Ledo','Žaros','Tylos','Vėtros','Kometos','Aušros'];
 const TRAIN={atk:{n:'Jėga',ico:'💪',per:1.5,u:'puolimo'},def:{n:'Gynyba',ico:'🧱',per:1.2,u:'gynybos'},hp:{n:'Gyvybė',ico:'❤️',per:8,u:'gyvybių'},spd:{n:'Greitis',ico:'⚡',per:1,u:'greičio'}};
-const TIERS=[{s:20,m:1},{s:60,m:3.4},{s:180,m:11}];
+const TIERS=[{s:60,m:.6,c:10},{s:180,m:2,c:35},{s:600,m:7,c:120}];
 const SHOP={heal:{ico:'🧪',n:'Gyvybės eliksyras',d:'Atkuria 50% gyvybių. Laikomas kuprinėje.',c:l=>20+l*6},xp:{ico:'📜',n:'Patirties ritinys',d:'+50% patirties 15 min.',c:l=>120+l*25},luck:{ico:'🍀',n:'Laimės dobilas',d:'+50% grobio šansas 15 min.',c:l=>100+l*20}};
 const CAMP_TOOLS={rod:{ico:'🎣',n:'Meškerė',d:'Leidžia žvejoti upėse ir ežeruose.',c:150},bow:{ico:'🏹',n:'Arbaletas',d:'Leidžia medžioti miško žvėris.',c:500},axe:{ico:'🪓',n:'Kirvis',d:'Leidžia kirsti medžius miške.',c:250},pick:{ico:'⛏️',n:'Kirtiklis',d:'Leidžia skaldyti akmenį uoloje.',c:650}};
 const CAMP_FOOD={fish:{ico:'🐟',n:'Žuvis',heal:.22,sell:l=>6+l*1.2},game:{ico:'🍖',n:'Žvėriena',heal:.38,sell:l=>14+l*2.5}};
@@ -277,7 +277,7 @@ const EXPED_DUR=45*60000;
 const expedReward=(p,c,lvl)=>{const base=Math.round((20+p.lvl*4)*(1+.1*(lvl-1)));return{zen:base,item:Math.random()<.25}};
 const ELEMENTS=[{id:'fire',n:'Ugnis',ico:'🔥'},{id:'ice',n:'Ledas',ico:'❄️'},{id:'earth',n:'Žemė',ico:'🪨'},{id:'shadow',n:'Šešėlis',ico:'🌑'}];
 const elemOf=name=>{const R=rng(hash('elem'+name));return ELEMENTS[(R()*ELEMENTS.length)|0].id};
-const ACTIVE_SKILL_CD=6*60*60000;
+const ACTIVE_SKILL_CD=5*60000;
 const ACTIVE_SKILLS={
  ugnis:{n:'Įniršio pliūpsnis',ico:'🔥',d:'Kitai kovai: +35% puolimas, +20% gynyba'},
  zemes:{n:'Žemės palaima',ico:'🌍',d:'Kitai kovai: +35% puolimas, +20% gynyba'},
@@ -661,10 +661,11 @@ const Server={
    else if(Math.random()<.3)Server.addItem(p,genItem(p.lvl,defeated>=unlocked.length-1,.3),res)}
   if(defeated>(p.marathon.best||0))p.marathon.best=defeated;
   return res},
- train(p,stat,tier){if(p.training)return{err:'Jau treniruojiesi.'};const t=TIERS[tier],secs=Math.round(t.s*RACES[p.race].train*trainM(p)),pts=Math.round(t.m*(1+Math.floor(p.lvl/4)));
+ train(p,stat,tier){if(p.training)return{err:'Jau treniruojiesi.'};const t=TIERS[tier],secs=Math.round(t.s*RACES[p.race].train*trainM(p)),pts=Math.round(t.m*(1+Math.floor(p.lvl/4))),cost=Math.round(t.c*(1+Math.floor(p.lvl/10)*.25));
+  if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;ensureToday(p);p.today.spend+=cost;
   p.training={stat,start:Date.now(),end:Date.now()+secs*1000,pts,tier};return{ok:1}},
  claimTraining(p){const t=p.training;if(!t||Date.now()<t.end)return null;ensureToday(p);p.train[t.stat]+=t.pts;p.training=null;p.today.train++;return t},
- rush(p){const t=p.training;if(!t)return{err:'Nėra treniruotės.'};const tierMul=1.5+((t.tier||0)*.9),cost=Math.ceil((t.end-Date.now())/1000*tierMul);if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;t.end=Date.now();return{ok:1}},
+ rush(p){const t=p.training;if(!t)return{err:'Nėra treniruotės.'};const tierMul=2.5+((t.tier||0)*1.5),cost=Math.ceil((t.end-Date.now())/1000*tierMul);if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;t.end=Date.now();return{ok:1}},
  heal(p){regen(p);ensureToday(p);const mx=stats(p).hp,miss=mx-p.hp,cost=Math.ceil(miss*.4);if(miss<1)return{err:'Gyvybės pilnos.'};if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;p.hp=mx;p.today.spend+=cost;return{ok:1,cost}},
  potion(p){regen(p);if(p.potions<1)return{err:'Neturi eliksyrų. Nusipirk kuprinėje.'};const mx=stats(p).hp;if(p.hp>=mx)return{err:'Gyvybės pilnos.'};p.potions--;p.hp=Math.min(mx,p.hp+mx*.5);return{ok:1}},
  buy(p,k){const s=SHOP[k],c=s.c(p.lvl),now=Date.now();if(c>p.zen)return{err:'Neužtenka monetų ('+fmt(c)+').'};p.zen-=c;ensureToday(p);p.today.spend+=c;
@@ -676,7 +677,9 @@ const Server={
   const it=genLegendaryForSlot(p.lvl,slot),res={};Server.addItem(p,it,res);return{ok:1,item:res.item,sold:res.sold}},
  openChest(p,tier){const def=CHEST_DEFS[tier];if(!def)return{err:'Nežinoma dėžė.'};
   ensureChests(p);
-  if(tier==='bronze'){if(p.chests.bronze<1)return{err:'Bronzinė dėžė dar neparuošta.'};const wasFull=p.chests.bronze>=def.max;p.chests.bronze--;if(wasFull)p.chests.bronzeAt=Date.now()}
+  if(tier==='bronze'){if(p.chests.bronze<1)return{err:'Bronzinė dėžė dar neparuošta.'};
+   const gapLeft=def.regenMs-(Date.now()-(p.chests.bronzeLastOpen||0));if(gapLeft>0)return{err:'Palauk dar '+Math.ceil(gapLeft/60000)+' min. iki kitos dėžės.'};
+   const wasFull=p.chests.bronze>=def.max;p.chests.bronze--;if(wasFull)p.chests.bronzeAt=Date.now();p.chests.bronzeLastOpen=Date.now()}
   else if(tier==='silver'){if(Date.now()<p.chests.silverNext)return{err:'Sidabrinė dėžė dar neparuošta.'};p.chests.silverNext=Date.now()+def.cooldownMs}
   else if(tier==='gold'){if((p.rub||0)<def.rub)return{err:'Neužtenka rubinų ('+def.rub+' 🔷).'};p.rub-=def.rub}
   const res={ok:1,tier};rollChestReward(p,tier,res);return res},
@@ -1379,7 +1382,7 @@ function allocCard(){const al=S.alloc||{atk:0,def:0,hp:0,spd:0},pts=S.statPts||0
  return`<div class="card"><div class="row"><h2 style="margin:0">⭐ Lygio taškai</h2><span class="tag ${pts?'gold':''}">${pts} laisvi</span></div><p class="mut" style="margin:6px 0">Už kiekvieną lygį gauni ${LEVEL_PTS} taškus — paskirstyk juos tarp jėgos, gynybos, gyvybės ir greičio visam laikui.</p>${rows}</div>`}
 function tabTrain(){let cur='';const t=S.training;
  if(t){const T=TRAIN[t.stat];cur=`<div class="card"><h2>Treniruojiesi</h2><div class="row"><b>${T.ico} ${T.n} +${t.pts}</b><span id="trt" class="mut"></span></div><div style="margin-top:6px">${bar('xp','trb',0)}</div><div style="margin-top:10px"><button class="sm" data-act="rush">⏩ Pagreitinti už <span id="rushc"></span> 🪙</button></div></div>`}
- const cards=Object.keys(TRAIN).map(k=>{const T=TRAIN[k];return`<div class="card"><div class="row"><b>${T.ico} ${T.n}</b><span class="mut">${S.train[k]} tšk. (+${Math.round(S.train[k]*T.per)} ${T.u})</span></div><div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px">${TIERS.map((x,i)=>{const s=Math.round(x.s*RACES[S.race].train*trainM(S)),pts=Math.round(x.m*(1+Math.floor(S.lvl/4)));return`<button class="sm" style="text-align:center;width:100%" data-act="train" data-arg="${k}:${i}" ${t?'disabled':''}>${s>=60?Math.round(s/60)+' min':s+' s'}<br><b>+${pts}</b></button>`}).join('')}</div></div>`}).join('');
+ const cards=Object.keys(TRAIN).map(k=>{const T=TRAIN[k];return`<div class="card"><div class="row"><b>${T.ico} ${T.n}</b><span class="mut">${S.train[k]} tšk. (+${Math.round(S.train[k]*T.per)} ${T.u})</span></div><div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px">${TIERS.map((x,i)=>{const s=Math.round(x.s*RACES[S.race].train*trainM(S)),pts=Math.round(x.m*(1+Math.floor(S.lvl/4))),cost=Math.round(x.c*(1+Math.floor(S.lvl/10)*.25));return`<button class="sm" style="text-align:center;width:100%" data-act="train" data-arg="${k}:${i}" ${t||cost>S.zen?'disabled':''}>${s>=60?Math.round(s/60)+' min':s+' s'}<br><b>+${pts}</b><br><span class="mut" style="font-size:11px">🪙 ${fmt(cost)}</span></button>`}).join('')}</div></div>`}).join('');
  return banner()+header()+cur+allocCard()+'<h2>Treniruotės</h2>'+cards+'<p class="mut">Treniruotės vyksta realiu laiku — gali uždaryti žaidimą ir grįžti vėliau.</p>'}
 function socketsHtml(it,slotKey){if(!it.sockets)it.sockets=new Array(sockCount(it)).fill(null);
  if(!it.sockets.length)return'<span class="mut" style="font-size:12px">Lizdų nėra (nuo Retumo)</span>';
@@ -1619,6 +1622,7 @@ function tabFriends(){return banner()+header()+`<button class="sm" data-act="tab
 function tabChests(){ensureChests(S);
  const bronzeHave=S.chests.bronze||0,bronzeFull=bronzeHave>=CHEST_DEFS.bronze.max;
  const bronzeNextIn=bronzeFull?0:CHEST_DEFS.bronze.regenMs-(Date.now()-S.chests.bronzeAt);
+ const bronzeGapLeft=Math.max(0,CHEST_DEFS.bronze.regenMs-(Date.now()-(S.chests.bronzeLastOpen||0)));
  const silverWait=Math.max(0,(S.chests.silverNext||0)-Date.now());
  const row=(tier,statusHtml,canOpen)=>{const d=CHEST_DEFS[tier];
   return`<div class="card" style="text-align:center"><div style="font-size:54px">${d.ico}</div><h2 style="margin:6px 0 2px;color:${d.c}">${d.n}</h2>
@@ -1626,7 +1630,7 @@ function tabChests(){ensureChests(S);
   <button class="pri" data-act="openchest" data-arg="${tier}" style="width:100%;margin-top:8px" ${canOpen?'':'disabled'}>🔓 Atidaryti</button></div>`};
  return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>
  <h2 style="margin:0 0 4px">📦 Dėžės</h2><p class="mut" style="margin-top:0">Atidaryk dėžes ir gauk palydovų, ginkluotės ar išteklių.</p>
- ${row('bronze',`<span class="tag">Turimos: ${bronzeHave}/${CHEST_DEFS.bronze.max}</span>${bronzeFull?'':` <span class="mut">⏳ Kita po ${mins(Date.now()+bronzeNextIn)}</span>`}`,bronzeHave>0)}
+ ${row('bronze',`<span class="tag">Turimos: ${bronzeHave}/${CHEST_DEFS.bronze.max}</span>${bronzeFull?'':` <span class="mut">⏳ Kita po ${mins(Date.now()+bronzeNextIn)}</span>`}${bronzeGapLeft>0?` <span class="mut">⏳ Kitą galėsi atidaryti po ${mins(Date.now()+bronzeGapLeft)}</span>`:''}`,bronzeHave>0&&bronzeGapLeft<=0)}
  ${row('silver',silverWait>0?`<span class="tag">⏳ Paruoš po ${mins(Date.now()+silverWait)}</span>`:`<span class="tag ok">Paruošta!</span>`,silverWait<=0)}
  ${row('gold',`<span class="tag gold">Kaina: ${CHEST_DEFS.gold.rub} 🔷 (turi ${S.rub||0} 🔷)</span>`,(S.rub||0)>=CHEST_DEFS.gold.rub)}`}
 function tabAdmin(){
