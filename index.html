@@ -219,7 +219,7 @@ const RAR=[{n:'Paprastas',m:1,c:'#9aa3b2',w:70,sell:3},{n:'Retas',m:1.6,c:'#4aa3
 const SLOTS={weapon:{n:'Ginklas',ico:'🗡️',names:['Kardas','Kirvis','Ietis','Plaktukas']},armor:{n:'Šarvai',ico:'🛡️',names:['Šarvai','Šalmas','Skydas','Apsiaustas']},charm:{n:'Amuletas',ico:'📿',names:['Amuletas','Žiedas','Talismanas']}};
 const PRE=['Žaibo','Šešėlio','Žvaigždžių','Geležies','Ledo','Žaros','Tylos','Vėtros','Kometos','Aušros'];
 const TRAIN={atk:{n:'Jėga',ico:'💪',per:1.5,u:'puolimo'},def:{n:'Gynyba',ico:'🧱',per:1.2,u:'gynybos'},hp:{n:'Gyvybė',ico:'❤️',per:8,u:'gyvybių'},spd:{n:'Greitis',ico:'⚡',per:1,u:'greičio'}};
-const TIERS=[{s:60,m:.6,c:10},{s:180,m:2,c:35},{s:600,m:7,c:120}];
+const TIERS=[{s:60,m:1,c:10},{s:180,m:3,c:35},{s:600,m:5,c:120}];
 const SHOP={heal:{ico:'🧪',n:'Gyvybės eliksyras',d:'Atkuria 50% gyvybių. Laikomas kuprinėje.',c:l=>20+l*6},xp:{ico:'📜',n:'Patirties ritinys',d:'+50% patirties 15 min.',c:l=>120+l*25},luck:{ico:'🍀',n:'Laimės dobilas',d:'+50% grobio šansas 15 min.',c:l=>100+l*20}};
 const CAMP_TOOLS={rod:{ico:'🎣',n:'Meškerė',d:'Leidžia žvejoti upėse ir ežeruose.',c:150},bow:{ico:'🏹',n:'Arbaletas',d:'Leidžia medžioti miško žvėris.',c:500},axe:{ico:'🪓',n:'Kirvis',d:'Leidžia kirsti medžius miške.',c:250},pick:{ico:'⛏️',n:'Kirtiklis',d:'Leidžia skaldyti akmenį uoloje.',c:650}};
 const CAMP_FOOD={fish:{ico:'🐟',n:'Žuvis',heal:.22,sell:l=>6+l*1.2},game:{ico:'🍖',n:'Žvėriena',heal:.38,sell:l=>14+l*2.5}};
@@ -661,7 +661,7 @@ const Server={
    else if(Math.random()<.3)Server.addItem(p,genItem(p.lvl,defeated>=unlocked.length-1,.3),res)}
   if(defeated>(p.marathon.best||0))p.marathon.best=defeated;
   return res},
- train(p,stat,tier){if(p.training)return{err:'Jau treniruojiesi.'};const t=TIERS[tier],secs=Math.round(t.s*RACES[p.race].train*trainM(p)),pts=Math.round(t.m*(1+Math.floor(p.lvl/4))),cost=Math.round(t.c*(1+Math.floor(p.lvl/10)*.25));
+ train(p,stat,tier){if(p.training)return{err:'Jau treniruojiesi.'};const t=TIERS[tier],secs=Math.round(t.s*RACES[p.race].train*trainM(p)),pts=t.m,cost=Math.round(t.c*(1+Math.floor(p.lvl/10)*.25));
   if(cost>p.zen)return{err:'Neužtenka monetų ('+fmt(cost)+').'};p.zen-=cost;ensureToday(p);p.today.spend+=cost;
   p.training={stat,start:Date.now(),end:Date.now()+secs*1000,pts,tier};return{ok:1}},
  claimTraining(p){const t=p.training;if(!t||Date.now()<t.end)return null;ensureToday(p);p.train[t.stat]+=t.pts;p.training=null;p.today.train++;return t},
@@ -1382,7 +1382,7 @@ function allocCard(){const al=S.alloc||{atk:0,def:0,hp:0,spd:0},pts=S.statPts||0
  return`<div class="card"><div class="row"><h2 style="margin:0">⭐ Lygio taškai</h2><span class="tag ${pts?'gold':''}">${pts} laisvi</span></div><p class="mut" style="margin:6px 0">Už kiekvieną lygį gauni ${LEVEL_PTS} taškus — paskirstyk juos tarp jėgos, gynybos, gyvybės ir greičio visam laikui.</p>${rows}</div>`}
 function tabTrain(){let cur='';const t=S.training;
  if(t){const T=TRAIN[t.stat];cur=`<div class="card"><h2>Treniruojiesi</h2><div class="row"><b>${T.ico} ${T.n} +${t.pts}</b><span id="trt" class="mut"></span></div><div style="margin-top:6px">${bar('xp','trb',0)}</div><div style="margin-top:10px"><button class="sm" data-act="rush">⏩ Pagreitinti už <span id="rushc"></span> 🪙</button></div></div>`}
- const cards=Object.keys(TRAIN).map(k=>{const T=TRAIN[k];return`<div class="card"><div class="row"><b>${T.ico} ${T.n}</b><span class="mut">${S.train[k]} tšk. (+${Math.round(S.train[k]*T.per)} ${T.u})</span></div><div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px">${TIERS.map((x,i)=>{const s=Math.round(x.s*RACES[S.race].train*trainM(S)),pts=Math.round(x.m*(1+Math.floor(S.lvl/4))),cost=Math.round(x.c*(1+Math.floor(S.lvl/10)*.25));return`<button class="sm" style="text-align:center;width:100%" data-act="train" data-arg="${k}:${i}" ${t||cost>S.zen?'disabled':''}>${s>=60?Math.round(s/60)+' min':s+' s'}<br><b>+${pts}</b><br><span class="mut" style="font-size:11px">🪙 ${fmt(cost)}</span></button>`}).join('')}</div></div>`}).join('');
+ const cards=Object.keys(TRAIN).map(k=>{const T=TRAIN[k];return`<div class="card"><div class="row"><b>${T.ico} ${T.n}</b><span class="mut">${S.train[k]} tšk. (+${Math.round(S.train[k]*T.per)} ${T.u})</span></div><div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px">${TIERS.map((x,i)=>{const s=Math.round(x.s*RACES[S.race].train*trainM(S)),pts=x.m,cost=Math.round(x.c*(1+Math.floor(S.lvl/10)*.25));return`<button class="sm" style="text-align:center;width:100%" data-act="train" data-arg="${k}:${i}" ${t||cost>S.zen?'disabled':''}>${s>=60?Math.round(s/60)+' min':s+' s'}<br><b>+${pts}</b><br><span class="mut" style="font-size:11px">🪙 ${fmt(cost)}</span></button>`}).join('')}</div></div>`}).join('');
  return banner()+header()+cur+allocCard()+'<h2>Treniruotės</h2>'+cards+'<p class="mut">Treniruotės vyksta realiu laiku — gali uždaryti žaidimą ir grįžti vėliau.</p>'}
 function socketsHtml(it,slotKey){if(!it.sockets)it.sockets=new Array(sockCount(it)).fill(null);
  if(!it.sockets.length)return'<span class="mut" style="font-size:12px">Lizdų nėra (nuo Retumo)</span>';
