@@ -12,7 +12,8 @@
   function buildSide(){
     const side=document.createElement('div');
     side.className='db-side';
-    side.innerHTML=NAV.map(([id,ic])=>
+    side.innerHTML=`<img class="db-logo" src="img/logo/icon.svg" alt="" data-act="tab" data-arg="kova">`+
+      NAV.map(([id,ic])=>
       `<button class="db-nv${typeof ui!=='undefined'&&ui.tab===id?' on':''}" data-act="tab" data-arg="${id}"><span class="ic">${ic}</span>${esc(t(id))}</button>`
     ).join('');
     return side;
