@@ -104,6 +104,7 @@ details summary{cursor:pointer;padding:4px 0}
   #app{max-width:880px}
 }
 </style>
+<link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 <div id="app"></div>
@@ -1292,7 +1293,7 @@ function topZone(){for(let i=ZONES.length-1;i>=0;i--)if(S.lvl>=ZONES[i].lvl)retu
 function header(){const st=stats(S),now=Date.now(),b=[],cp=S.comp.active?COMPANIONS.find(c=>c.id===S.comp.active):null;
  if(S.buffUntil>now)b.push('✨ +15% galia · '+mins(S.buffUntil));if(S.xpUntil>now)b.push('📜 +50% XP · '+mins(S.xpUntil));if(S.luckUntil>now)b.push('🍀 +50% grobis · '+mins(S.luckUntil));
 const title=S.title?TITLES.find(t=>t.id===S.title):null;
- return`<div class="card"><div class="row2"><div class="thumb">${fighterArt(S.race)}</div><div style="flex:1;min-width:0"><div class="row"><h1 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.name)}</h1><div class="gold" style="font-weight:700;white-space:nowrap">🪙 <span id="zen">${fmt(S.zen)}</span></div></div>
+ return`<div class="card" id="charHead"><div class="row2"><div class="thumb">${fighterArt(S.race)}</div><div style="flex:1;min-width:0"><div class="row"><h1 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.name)}</h1><div class="gold" style="font-weight:700;white-space:nowrap">🪙 <span id="zen">${fmt(S.zen)}</span></div></div>
  ${title?`<div class="gold" style="font-size:13px;margin-top:-2px">🌟 ${esc(title.n)}</div>`:''}
  <span class="tag">Lyg. ${S.lvl}</span>${S.prestige?` <span class="tag gold">⭐×${S.prestige}</span>`:''}${S.ascend?` <span class="tag gold">✨×${S.ascend}</span>`:''} <span class="tag">⚔️ ${fmt(power(st))}</span> <span class="tag">🧪 ${S.potions}</span> <span class="tag">💎 ${S.crystals}/7</span>${S.rub?` <span class="tag gold">🔷 ${fmt(S.rub)}</span>`:''}${cp?` <span class="tag">${cp.ico} ${esc(cp.n)}</span>`:''}</div></div>
  ${b.length?`<div style="margin-top:6px">${b.map(x=>`<span class="tag gold">${x}</span>`).join(' ')}</div>`:''}
@@ -2030,5 +2031,6 @@ function firebaseBootstrap(){if(!fbOK)return;
  })}
 firebaseBootstrap();
 </script>
+<script src="dashboard.js"></script>
 </body>
 </html>
