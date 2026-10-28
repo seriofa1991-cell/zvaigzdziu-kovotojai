@@ -344,6 +344,7 @@ const WAR_TIERS=[
  {need:600,zen:5500,rub:9}
 ];
 function personalWarPoints(p){return wkVal(p,'win')*1+wkVal(p,'boss')*4+wkVal(p,'arena')*2}
+const MARKET_LIST_FEE=25,MARKET_PRICE_MAX=500000,MARKET_MY_MAX=10;
 const MISSIONS=[
  {n:'Pirmieji žingsniai',d:'Pasiek 5 lygį',c:p=>p.lvl>=5,zen:100,xp:0},
  {n:'Ginkluotas kovotojas',d:'Apsirenk bet kokiu ginklu',c:p=>!!(p.equip&&p.equip.weapon),zen:150,xp:0},
@@ -997,6 +998,51 @@ async function guildWarContributeAsync(){
   else await ref.update({['war.score']:firebase.firestore.FieldValue.increment(delta)});
  }catch(e){return{err:'Nepavyko prisidėti.'}}
  S.warWk.contrib=total;save();await refreshGuildCache(S.guild);return{ok:1,delta}}
+let MARKET_CACHE=null,MARKET_MINE_CACHE=null;
+function refreshMarketList(){if(!fbOK)return Promise.resolve();
+ return fbDb.collection('listings').where('status','==','active').orderBy('listedAt','desc').limit(40).get().then(snap=>{
+  MARKET_CACHE=snap.docs.map(d=>({id:d.id,...d.data()}));if(ui.tab==='market')render()
+ }).catch(e=>{MARKET_CACHE=MARKET_CACHE||[];console.warn('market fetch failed',e)})}
+function refreshMyListings(){if(!fbOK)return Promise.resolve();
+ return fbDb.collection('listings').where('seller','==',USER).where('status','==','active').limit(20).get().then(snap=>{
+  MARKET_MINE_CACHE=snap.docs.map(d=>({id:d.id,...d.data()}));if(ui.tab==='market')render()
+ }).catch(e=>{MARKET_MINE_CACHE=MARKET_MINE_CACHE||[];console.warn('my listings fetch failed',e)})}
+async function marketListAsync(invId,price){
+ price=Math.floor(price);
+ if(!price||price<1||price>MARKET_PRICE_MAX)return{err:'Netinkama kaina (1–'+fmt(MARKET_PRICE_MAX)+' 🪙).'};
+ if(MARKET_LIST_FEE>S.zen)return{err:'Neužtenka monetų skelbimo mokesčiui ('+MARKET_LIST_FEE+' 🪙).'};
+ if((MARKET_MINE_CACHE||[]).length>=MARKET_MY_MAX)return{err:'Jau turi '+MARKET_MY_MAX+' aktyvių skelbimų.'};
+ const i=S.inv.findIndex(x=>x.id===invId);if(i<0)return{err:'Daiktas nerastas.'};
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const it=S.inv[i];
+ const ref=fbDb.collection('listings').doc();
+ const doc={id:ref.id,seller:USER,sellerName:S.name,item:it,price,listedAt:Date.now(),status:'active'};
+ try{await ref.set(doc)}catch(e){return{err:'Nepavyko sukurti skelbimo.'}}
+ S.inv.splice(i,1);S.zen-=MARKET_LIST_FEE;save();await refreshMyListings();return{ok:1}}
+async function marketCancelAsync(listingId){
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const ref=fbDb.collection('listings').doc(listingId),snap=await ref.get().catch(()=>null);
+ if(!snap||!snap.exists)return{err:'Skelbimas nerastas.'};
+ const l=snap.data();if(l.seller!==USER)return{err:'Tai ne tavo skelbimas.'};
+ try{await ref.delete()}catch(e){return{err:'Nepavyko atšaukti.'}}
+ Server.addItem(S,l.item,{});save();await refreshMyListings();return{ok:1}}
+async function marketBuyAsync(listingId){
+ if(!fbOK)return{err:'Nėra ryšio su serveriu.'};
+ const ref=fbDb.collection('listings').doc(listingId),snap=await ref.get().catch(()=>null);
+ if(!snap||!snap.exists)return{err:'Skelbimas jau nebegalioja.'};
+ const l=snap.data();
+ if(l.status!=='active')return{err:'Skelbimas jau parduotas.'};
+ if(l.seller===USER)return{err:'Negali pirkti savo skelbimo.'};
+ if(l.price>S.zen)return{err:'Neužtenka monetų ('+fmt(l.price)+').'};
+ try{await ref.delete()}catch(e){return{err:'Nepavyko nupirkti — bandyk vėl.'}}
+ S.zen-=l.price;Server.addItem(S,{...l.item,id:undefined},{});save();
+ try{
+  const sSnap=await fbDb.collection('saves').doc(l.seller).get();
+  if(sSnap.exists){let raw;try{raw=JSON.parse(sSnap.data().json)}catch(e){raw=null}
+   if(raw){const sp=migrate(raw);sp.zen=(sp.zen||0)+l.price;
+    await fbDb.collection('saves').doc(l.seller).set({json:JSON.stringify(sp),savedAt:Date.now(),name:sp.name,lvl:sp.lvl})}}
+ }catch(e){}
+ return{ok:1,item:l.item,price:l.price}}
 async function friendAddAsync(name){const uk=(name||'').trim().toLowerCase();
  if(!uk)return{err:'?'};if(uk===USER)return{err:'Tai tu pats.'};
  if(!S.friends)S.friends=[];if(S.friends.includes(uk))return{err:'Jau draugas.'};
@@ -1479,7 +1525,8 @@ function tabKova(){const z=ZONES[ui.zone],P=stats(S),dn=Server.dailyNext(S);
  +`<div class="grid" style="margin-bottom:12px">${opts}</div>`+activeSkillCard()+questCard()+weeklyQuestCard()
  +`<button class="pri fb" data-act="bosses" style="width:100%;margin-bottom:12px">👑 Bosai ir iššūkiai${bossN?` <span class="tag gold">${bossN}</span>`:''}</button>
  <button class="pri fb" data-act="tab" data-arg="chests" style="width:100%;margin-bottom:12px">📦 Dėžės${chestFreeReady(S)?' <span class="tag ok">🎁</span>':''}</button>
- <div class="grid g2" style="margin-bottom:12px"><button data-act="tab" data-arg="guild">🏰 Gildija</button><button data-act="tab" data-arg="friends">🤝 Draugai</button></div>`}
+ <div class="grid g2" style="margin-bottom:12px"><button data-act="tab" data-arg="guild">🏰 Gildija</button><button data-act="tab" data-arg="friends">🤝 Draugai</button></div>
+ <button data-act="tab" data-arg="market" style="width:100%;margin-bottom:12px">🏪 Prekyvietė</button>`}
 function marathonCard(){const day=dstr(Date.now());if(!S.marathon)S.marathon={d:'',claimed:false,best:0};
  const claimed=S.marathon.d===day&&S.marathon.claimed,n=ZONES.filter(z=>S.lvl>=z.lvl).length;
  return`<div class="card"><div class="row"><h2 style="margin:0">🔥 Bosų maratonas</h2><span class="tag">Geriausias: ${S.marathon.best||0}/${n}</span></div>
@@ -1739,6 +1786,18 @@ function tabProf(){const r=RACES[S.race];return banner()+`<div class="card" styl
  <button data-act="tab" data-arg="admin">🛠️ Administratorius</button>`}
 function tabGuild(){return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>${guildCard()}`}
 function tabFriends(){return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>${friendsCard()}`}
+function tabMarket(){return banner()+header()+`<button class="sm" data-act="tab" data-arg="kova" style="margin-bottom:10px">← Atgal</button>${marketCard()}`}
+function marketCard(){
+ const mine=MARKET_MINE_CACHE,all=MARKET_CACHE;
+ const mineRows=(mine||[]).map(l=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)">${itemArt(l.item)}<div style="flex:1;min-width:0">${itemLine(l.item)}<div class="mut" style="font-size:12px">Kaina: ${fmt(l.price)} 🪙</div></div><button class="sm" data-act="marketcancel" data-arg="${l.id}" style="color:var(--bad)">✕ Atšaukti</button></div>`).join('');
+ const browseRows=(all||[]).filter(l=>l.seller!==USER).map(l=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)">${itemArt(l.item)}<div style="flex:1;min-width:0">${itemLine(l.item)}<div class="mut" style="font-size:12px">Pardavėjas: ${esc(l.sellerName||l.seller)}</div></div><button class="sm pri" data-act="marketbuy" data-arg="${l.id}" ${l.price>S.zen?'disabled':''}>💰 ${fmt(l.price)} 🪙</button></div>`).join('');
+ const sel=ui.marketSel,invRows=S.inv.map(it=>`<div class="row2" style="padding:5px 0;border-bottom:1px solid var(--line)${sel===it.id?';background:rgba(255,176,46,.08)':''}">${itemArt(it)}<div style="flex:1;min-width:0">${itemLine(it)}</div><button class="sm${sel===it.id?' pri':''}" data-act="marketsel" data-arg="${it.id}">${sel===it.id?'✔️ Pasirinkta':'Pasirinkti'}</button></div>`).join('');
+ return`<div class="card"><h2>🏪 Prekyvietė</h2><p class="mut" style="margin-top:0">Parduok nenaudojamus daiktus kitiems žaidėjams arba nusipirk ko trūksta. Skelbimo mokestis: ${MARKET_LIST_FEE} 🪙. Iki ${MARKET_MY_MAX} aktyvių skelbimų vienu metu.</p>
+ <h2 style="margin:14px 0 2px">📤 Mano skelbimai (${(mine||[]).length}/${MARKET_MY_MAX})</h2>${mine===null?'<p class="mut">⏳ Kraunama...</p>':mineRows||'<p class="mut">Neturi aktyvių skelbimų.</p>'}
+ <h2 style="margin:14px 0 2px">➕ Parduoti daiktą</h2>
+ ${S.inv.length?invRows:'<p class="mut">Kuprinė tuščia.</p>'}
+ <div class="row" style="margin-top:8px;gap:6px"><input id="mprice" type="number" min="1" placeholder="Kaina 🪙" style="flex:1"><button class="sm pri" data-act="marketlist" ${sel?'':'disabled'}>📤 Kelti skelbimą</button></div>
+ <h2 style="margin:14px 0 2px">🛒 Prekyvietė (kitų žaidėjų skelbimai)</h2>${all===null?'<p class="mut">⏳ Kraunama...</p>':browseRows||'<p class="mut">Šiuo metu skelbimų nėra.</p>'}</div>`}
 function tabChests(){ensureChests(S);
  const bronzeHave=S.chests.bronze||0,bronzeFull=bronzeHave>=CHEST_DEFS.bronze.max;
  const bronzeNextIn=bronzeFull?0:CHEST_DEFS.bronze.regenMs-(Date.now()-S.chests.bronzeAt);
@@ -1804,7 +1863,7 @@ function render(){const app=$('#app');
  if(!S&&ui.tab!=='admin'){app.innerHTML=tabCreate();return}
  if(!S){app.innerHTML=tabAdmin();return}
  const tabs=[['kova','⚔️',t('kova')],['train','💪',t('train')],['bag','🎒',t('bag')],['camp','🏕️',t('camp')],['arena','🏟️',t('arena')],['prof','👤',t('prof')]];
- const body={kova:tabKova,train:tabTrain,bag:tabBag,camp:tabCamp,arena:tabArena,prof:tabProf,admin:tabAdmin,guild:tabGuild,friends:tabFriends,chests:tabChests}[ui.tab]();
+ const body={kova:tabKova,train:tabTrain,bag:tabBag,camp:tabCamp,arena:tabArena,prof:tabProf,admin:tabAdmin,guild:tabGuild,friends:tabFriends,chests:tabChests,market:tabMarket}[ui.tab]();
  ensureToday(S);
  const questReady=S.quests.ids.some(id=>{if(S.quests.claimed.includes(id))return false;const q=QUEST_POOL.find(x=>x.id===id);return q&&(S.today[q.key]||0)>=q.need});
  const campReady=(S.camp.fireUntil>Date.now()&&((S.camp.raw.fish||0)>0||(S.camp.raw.game||0)>0))||(S.farm.plot&&Date.now()>=S.farm.plot.end)||animAcc(S,'hen')>0||animAcc(S,'cow')>0;
@@ -1992,6 +2051,10 @@ function act(a,arg,btn){
  if(a==='guilddonate'){const v=parseInt((($('#gdon')||{}).value)||'0',10);guildDonateAsync(v).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Paaukota '+fmt(r.amt)+' 🪙 į iždą');Snd.play('coin');render()});return}
  if(a==='guilddonateitem'){guildDonateItemAsync(+arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('💰 Daiktas paaukotas (+'+fmt(r.val)+' 🪙 į iždą)');Snd.play('coin');render()});return}
  if(a==='guildupgrade'){toast('⏳ Keliamas lygis...');guildUpgradeAsync(arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🏛️ Lygis pakeltas iki '+r.lvl+'!');Snd.play('lvl');render()});return}
+ if(a==='marketsel'){ui.marketSel=+arg;render();return}
+ if(a==='marketlist'){const price=parseInt((($('#mprice')||{}).value)||'0',10);toast('⏳ Keliamas skelbimas...');marketListAsync(ui.marketSel,price).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}ui.marketSel=null;toast('📤 Skelbimas sukurtas!');Snd.play('coin');render()});return}
+ if(a==='marketcancel'){toast('⏳ Atšaukiama...');marketCancelAsync(arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('↩️ Skelbimas atšauktas, daiktas grąžintas.');render()});return}
+ if(a==='marketbuy'){toast('⏳ Pirkimas...');marketBuyAsync(arg).then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('🛒 Nupirkta! +1 daiktas kuprinėje.');Snd.play('coin');refreshMarketList();render()});return}
  if(a==='guildwarcontribute'){toast('⏳ Prisidedama...');guildWarContributeAsync().then(r=>{if(r.err){toast(r.err);Snd.play('err');return}toast('⚔️ Prisidėjai +'+fmt(r.delta)+' karo taškų!');Snd.play('coin');render()});return}
  if(a==='claimwartier'){const r=Server.claimWarTier(S,+arg);if(r.err){toast(r.err);Snd.play('err');return}save();toast('🎁 Karo premija +'+fmt(r.zen)+' 🪙'+(r.rub?' +'+r.rub+' 🔷':''));Snd.play('crystal');render();return}
  if(a==='togglepublic'){const r=Server.togglePublic(S);toast(r.pub?'👁️ Profilis vieša':'🔒 Profilis paslėptas');save();render();return}
@@ -2003,7 +2066,7 @@ function act(a,arg,btn){
  if(a==='bossback'){ui.bossScreen=false;render();scrollTo(0,0);return}
  if(a==='race'){const n=$('#nm');if(n)ui.name=n.value;ui.race=arg;render();return}
  if(a==='create'){const n=($('#nm').value||'').trim();if(n.length<2){toast('Įvesk vardą (bent 2 raidės).');Snd.play('err');return}S=newState(n,ui.race);S.tutSeen=false;S.resetV=RESET_V;S.hp=stats(S).hp;save();ui.tab='kova';ui.zone=0;render();Snd.play('lvl');return}
- if(a==='tab'){ui.tab=arg;ui.bossScreen=false;if(arg==='guild'){if(S.guild)refreshGuildCache(S.guild);else refreshGuildList();refreshGuildWarList()}else if(arg==='arena')refreshRankList();render();scrollTo(0,0);return}
+ if(a==='tab'){ui.tab=arg;ui.bossScreen=false;if(arg==='guild'){if(S.guild)refreshGuildCache(S.guild);else refreshGuildList();refreshGuildWarList()}else if(arg==='market'){refreshMarketList();refreshMyListings()}else if(arg==='arena')refreshRankList();render();scrollTo(0,0);return}
  if(a==='alogin'){const v=($('#apw').value||'');sha(v).then(h=>{if(h===null){toast('Admin veikia tik per https://');return}if(h===ADMIN_HASH){ui.admin=true;try{sessionStorage.setItem('zk_admin','1')}catch(e){}toast('Prisijungta');render()}else{toast('Neteisingas slaptažodis');Snd.play('err')}});return}
  if(a==='alogout'){ui.admin=false;try{sessionStorage.removeItem('zk_admin')}catch(e){}ui.tab=S?'prof':'kova';render();return}
  if(a==='asave'||a==='aimg'||a==='aexp'||a==='aimp'||a==='adef'){if(!ui.admin)return;adminCfg(a);render();return}
