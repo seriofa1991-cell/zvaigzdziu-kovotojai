@@ -48,6 +48,47 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // ---------- LISTINGS (prekyvietės skelbimai) ----------
+    // Bet kas prisijungęs gali sukurti skelbimą su pagrįstomis reikšmėmis.
+    // Trynimas leidžiamas bet kuriam prisijungusiam vartotojui, nes
+    // pirkimo funkcija ištrina KITO žaidėjo skelbimą (pirkėjas, ne
+    // pardavėjas) — tai sąmoningas pasirinkimas, atitinkantis esamą
+    // "ribojame reikšmes, ne kas rašo" stilių.
+    match /listings/{id} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['id','seller','sellerName','item','price','listedAt','status'])
+        && request.resource.data.id is string
+        && request.resource.data.seller is string
+        && request.resource.data.sellerName is string
+        && request.resource.data.sellerName.size() <= 40
+        && request.resource.data.item is map
+        && request.resource.data.price is number
+        && request.resource.data.price >= 1
+        && request.resource.data.price <= 500000
+        && request.resource.data.listedAt is number
+        && request.resource.data.status == 'active';
+      allow update: if false;
+      allow delete: if request.auth != null;
+    }
+
+    // ---------- CHAT (gildijos / globalus čatas) ----------
+    // Tik kūrimas — žinučių niekas netrina ir neredaguoja iš kliento.
+    match /chat/{id} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['ch','uk','name','text','ts'])
+        && request.resource.data.ch is string
+        && request.resource.data.uk is string
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 200
+        && request.resource.data.ts is number;
+      allow update, delete: if false;
+    }
+
     // Viskas kita — uždrausta pagal nutylėjimą.
     match /{document=**} {
       allow read, write: if false;
