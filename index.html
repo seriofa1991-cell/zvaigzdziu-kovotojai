@@ -1794,7 +1794,7 @@ function tabProf(){const r=RACES[S.race];return banner()+`<div class="card" styl
  ${accessCard()}
  ${compCard()}
  <div class="card"><h2>🔊 Garsai</h2><div class="row"><button class="sm" data-act="snd">${Snd.on?'🔊 Įjungta':'🔇 Išjungta'}</button><input id="vol" type="range" min="0" max="1" step="0.05" value="${Snd.vol}" style="flex:1"></div></div>
- <div class="card"><h2>🔔 Pranešimai</h2><p class="mut" style="margin-top:0">Gauk naršyklės pranešimą, kai baigiasi treniruotė, užgęsta laužas arba atsinaujina pasaulio bosas (kol žaidimas atidarytas).</p><button class="sm" data-act="notif">${Notif.on?'🔔 Įjungta':'🔕 Išjungta'}</button></div>
+ <div class="card"><h2>🔔 Pranešimai</h2><p class="mut" style="margin-top:0">Gauk naršyklės pranešimą, kai baigiasi treniruotė, grįžta ekspedicija, paruošta dėžė, užgęsta laužas arba atsinaujina pasaulio bosas. Veikia, kol šis skirtukas atidarytas (gali būti fone, bet nebūtinai visiškai uždarytas).</p><button class="sm" data-act="notif">${Notif.on?'🔔 Įjungta':'🔕 Išjungta'}</button></div>
  <div class="card"><h2>🙈 Profilio matomumas</h2><p class="mut" style="margin-top:0">Kai paslėptas, kiti žaidėjai negalės apžiūrėti tavo apsirengimo ar tavęs užpulti.</p><button class="sm${S.profilePublic===false?'':' pri'}" data-act="togglepublic">${S.profilePublic===false?'🔒 Paslėptas — rodyti':'👁️ Viešas — paslėpti'}</button></div>
  <div class="card"><h2>🖼️ Pasiekimų kortelė</h2><p class="mut" style="margin-top:0">Atsisiųsk savo kovotojo kortelę su statistika — gali ja pasidalinti.</p><button class="pri" data-act="sharecard">📤 Atsisiųsti kortelę (PNG)</button></div>
  <div class="card"><h2>Išsaugojimas</h2><p class="mut" style="margin-top:0">Žaidimas saugomas šiame įrenginyje. Pasidaryk atsarginę kopiją.</p><div class="grid g2"><button data-act="export">📤 Eksportuoti</button><button data-act="import">📥 Importuoti</button></div><div style="margin-top:8px"><button data-act="reset" style="color:var(--bad)">🗑️ Pradėti iš naujo</button></div></div>
@@ -1902,11 +1902,13 @@ function dayNightTint(){const h=new Date().getHours()+new Date().getMinutes()/60
  if(h>=20&&h<22)return'rgba(90,70,160,.28)';// sutemos
  return'rgba(10,14,40,.5)'}// naktis
 function updateDayNight(){const el=document.getElementById('daynight');if(el)el.style.background=dayNightTint()}
-let _notifDay='',_notifFire=false,_hofAt=0;
+let _notifDay='',_notifFire=false,_hofAt=0,_notifExped=false,_notifChest=false;
 function tick(){updateDayNight();if(!S)return;regen(S);
  if(Date.now()-_hofAt>10000){_hofAt=Date.now();hofUpdate(S)}
  const d0=dstr(Date.now());if(!_notifDay)_notifDay=d0;else if(d0!==_notifDay){_notifDay=d0;Notif.fire('🌋 Pasaulio bosas atsinaujino!','Naujas iššūkis laukia — eik pulti!')}
  const fireNow=S.camp.fireUntil>Date.now();if(_notifFire&&!fireNow)Notif.fire('🔥 Laužas užgeso','Grįžk prie stovyklos, kad vėl uždegtum ugnį.');_notifFire=fireNow;
+ const expedReady=!!(S.comp&&S.comp.exped&&S.comp.exped.end<=Date.now());if(expedReady&&!_notifExped)Notif.fire('🧭 Ekspedicija grįžo!','Tavo palydovas parsinešė grobio.');_notifExped=expedReady;
+ const chestReady=(S.chests.bronze||0)>0&&Math.max(0,CHEST_DEFS.bronze.regenMs-(Date.now()-(S.chests.bronzeLastOpen||0)))<=0;if(chestReady&&!_notifChest)Notif.fire('📦 Dėžė paruošta','Bronzinę dėžę gali atidaryti dar kartą.');_notifChest=chestReady;
  const t=S.training;if(t&&Date.now()>=t.end){const d=Server.claimTraining(S);if(d){toast(`${TRAIN[d.stat].ico} Treniruotė baigta: ${TRAIN[d.stat].n} +${d.pts}`);Snd.play('coin');Notif.fire('💪 Treniruotė baigta',`${TRAIN[d.stat].n} +${d.pts}`);save();if(ui.tab!=='admin'&&!busy)render();return}}
  const st=stats(S),el=id=>document.getElementById(id);
  if(el('hpb')){el('hpb').style.width=clamp(S.hp/st.hp*100,0,100)+'%';el('hpt').textContent=fmt(S.hp)+' / '+fmt(st.hp);el('xpb').style.width=clamp(S.xp/xpNeed(S.lvl)*100,0,100)+'%';el('xpt').textContent=S.lvl>=MAXLVL?'MAX':fmt(S.xp)+' / '+fmt(xpNeed(S.lvl));el('zen').textContent=fmt(S.zen)}
