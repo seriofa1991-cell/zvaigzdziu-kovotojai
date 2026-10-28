@@ -324,6 +324,18 @@ const WQUEST_POOL=[
  {id:'wspend1500',d:'Išleisk 1500 monetų',need:1500,key:'spend',zen:500}
 ];
 const WQUEST_STREAK_CAP=10,WQUEST_STREAK_STEP=.07;
+const TOWER_RANKS=[
+ {min:0,n:'Bokšto naujokas',ico:'🪜'},
+ {min:10,n:'Bokšto kopikas',ico:'🧗'},
+ {min:20,n:'Aukštybių medžiotojas',ico:'🏹'},
+ {min:35,n:'Audrų valdovas',ico:'🌪️'},
+ {min:50,n:'Bokšto riteris',ico:'🛡️'},
+ {min:75,n:'Dangaus užkariautojas',ico:'☁️'},
+ {min:100,n:'Begalybės čempionas',ico:'♾️'},
+ {min:150,n:'Begalybės valdovas',ico:'👑'}
+];
+function towerRank(best){let r=TOWER_RANKS[0];for(const t of TOWER_RANKS)if((best||0)>=t.min)r=t;return r}
+function towerNextRank(best){return TOWER_RANKS.find(t=>t.min>(best||0))||null}
 const MISSIONS=[
  {n:'Pirmieji žingsniai',d:'Pasiek 5 lygį',c:p=>p.lvl>=5,zen:100,xp:0},
  {n:'Ginkluotas kovotojas',d:'Apsirenk bet kokiu ginklu',c:p=>!!(p.equip&&p.equip.weapon),zen:150,xp:0},
@@ -622,7 +634,9 @@ const Server={
   if(!p.survival)p.survival={wave:0,best:0};
   const wave=p.survival.wave+1,E=Server.survivalEnemy(p,wave),P=stats(p),php0=p.hp,sim=simulate(P,E,p.hp,activeProcs(p));Server.after(p,P,sim,now);
   const res={survival:true,win:sim.win,rounds:sim.rounds,log:sim.log,e:E,zi:E.zi,pmax:P.hp,pstart:php0,xp:0,zen:0,item:null,wave,lvlUp:0};
-  if(sim.win){p.survival.wave=wave;if(wave>p.survival.best){p.survival.best=wave;res.newBest=true}
+  if(sim.win){p.survival.wave=wave;if(wave>p.survival.best){p.survival.best=wave;res.newBest=true;
+    const prevRank=towerRank(wave-1),newRank=towerRank(wave);
+    if(newRank!==prevRank){res.newRank=newRank;p.rub=(p.rub||0)+2;p.rubLifetime=(p.rubLifetime||0)+2;res.rankRub=2}}
    res.xp=Math.round(5*Math.pow(E.L,1.25)*(E.boss?1.8:1)*xpM(p,now)*(1+companionBuf(p,'xp')));
    res.zen=Math.round((6*E.L+rnd(0,10))*(E.boss?2:1)*CFG.zenMul*(1+companionBuf(p,'zen'))*zenM(p));p.zen+=res.zen;
    if(Math.random()<.12*(E.boss?2:1)*CFG.dropMul)Server.addItem(p,genItem(E.L,E.boss,.1),res);
@@ -1365,8 +1379,9 @@ const GUIDE_STEPS=[
 function guideCard(){const items=GUIDE_STEPS.map(g=>`<div class="row2" style="padding:7px 0;border-bottom:1px solid var(--line);align-items:flex-start"><div class="ithumb" style="display:flex;align-items:center;justify-content:center;font-size:20px">${g.ico}</div><div style="flex:1;min-width:0"><b>${esc(g.t)}</b><div class="mut">${esc(g.d)}</div></div></div>`).join('');
  return`<div class="card" style="border:1px solid var(--gold,#ffb02e)"><h2>📖 Pradžiamokslis</h2><p class="mut" style="margin-top:0">Sveikas atvykęs į Žvaigždžių Kovotojus! Trumpa apžvalga, kaip žaisti:</p>${items}
  <button class="pri" style="width:100%;margin-top:8px" data-act="guidedone">👍 Supratau, pradėti!</button></div>`}
-function survivalCard(){const sv=S.survival||{wave:0,best:0};
- return`<div class="card"><div class="row"><h2 style="margin:0">🌊 Išgyvenimas</h2><span class="tag gold">Rekordas: ${sv.best}</span></div><p class="mut" style="margin:6px 0">Kovok be poilsio prieš vis stiprėjančias bangas. Pralaimėjus serija nutrūksta.</p>
+function survivalCard(){const sv=S.survival||{wave:0,best:0},rank=towerRank(sv.best),next=towerNextRank(sv.best);
+ return`<div class="card"><div class="row"><h2 style="margin:0">🌊 Begalybės bokštas</h2><span class="tag gold">Rekordas: ${sv.best}</span></div><p class="mut" style="margin:6px 0">Kovok be poilsio prieš vis stiprėjančias bangas. Pralaimėjus serija nutrūksta — bet tavo bokšto laipsnis išsaugomas visiems laikams.</p>
+ <div class="row" style="margin-bottom:6px"><span class="tag">${rank.ico} ${esc(rank.n)}</span>${next?`<span class="mut" style="font-size:12px">iki „${next.ico} ${esc(next.n)}“: ${next.min-sv.best} bangų</span>`:'<span class="mut" style="font-size:12px">Aukščiausias laipsnis!</span>'}</div>
  <button class="pri fb" data-act="survival" style="width:100%">⚔️ Pulti (Banga ${sv.wave+1})</button>${sv.wave?`<p class="ok" style="margin:6px 0 0;text-align:center">Dabartinė serija: ${sv.wave} bangų</p>`:''}</div>`}
 function dungeonCard(){const d=S.dungeon,open=d&&d.expires>Date.now(),cost=keyCost(S);
  return`<div class="card"><div class="row"><h2 style="margin:0">🗝️ Požemis</h2><span class="tag gold">🗝️ ${S.keys||0}</span></div><p class="mut" style="margin:6px 0">Atidaryk raktu laikiną iššūkį prieš Požemio Valdovą — garantuotas retas/epinis grobis. Raktai retai krenta nugalėjus bosus, arba pirk už monetas.</p>
@@ -1577,7 +1592,7 @@ function missionCard(){const idx=S.missionIdx||0,done=idx>=MISSIONS.length;
  return`<div class="card"><h2>📜 Istorijos misijos (${idx}/${MISSIONS.length})</h2><div class="row"><b>${esc(m.n)}</b><span class="tag${ok?' ok':''}">${ok?'Paruošta':'Vykdoma'}</span></div><div class="mut" style="margin:4px 0 10px">${esc(m.d)}</div><button class="sm pri" data-act="claimmission" ${ok?'':'disabled'}>🎁 Atsiimti (+${fmt(m.zen)} 🪙)</button></div>`}
 function playtimeStr(ms){const h=Math.floor(ms/3600000),d=Math.floor(h/24);if(d>0)return d+' d. '+(h%24)+' val.';if(h>0)return h+' val. '+Math.floor((ms%3600000)/60000)+' min.';return Math.floor(ms/60000)+' min.'}
 function statsCard(){const total=S.wins+S.losses,wr=total?Math.round(S.wins/total*100):0,atotal=S.arenaW+S.arenaL,awr=atotal?Math.round(S.arenaW/atotal*100):0;
- const rows=[['⏱️ Žaidimo laikas',playtimeStr(Date.now()-S.created)],['⚔️ Kovų iš viso',fmt(total)+' ('+wr+'% pergalių)'],['👑 Nugalėti bosai',fmt(S.bosses)],['🏟️ Arenos kovų',fmt(atotal)+' ('+awr+'% pergalių)'],['💎 Surinkti rinkiniai',fmt(S.sets)],['🟨 Rasti legendiniai',fmt(S.legends)],['🐾 Palydovų',S.comp.owned.length+'/'+COMPANIONS.length],['🎖️ Pasiekimų',Object.keys(S.ach).length+'/'+ACH.length],['📅 Dovanų serija',fmt(S.daily.streak)+' d.'],['🔁 Veiksmų',fmt(S.actions)]];
+ const rows=[['⏱️ Žaidimo laikas',playtimeStr(Date.now()-S.created)],['⚔️ Kovų iš viso',fmt(total)+' ('+wr+'% pergalių)'],['👑 Nugalėti bosai',fmt(S.bosses)],['🏟️ Arenos kovų',fmt(atotal)+' ('+awr+'% pergalių)'],['💎 Surinkti rinkiniai',fmt(S.sets)],['🟨 Rasti legendiniai',fmt(S.legends)],['🐾 Palydovų',S.comp.owned.length+'/'+COMPANIONS.length],['🎖️ Pasiekimų',Object.keys(S.ach).length+'/'+ACH.length],['📅 Dovanų serija',fmt(S.daily.streak)+' d.'],['🗓️ Savaitės serija',fmt(S.wquests&&S.wquests.streak||0)+' sav.'],[towerRank(S.survival&&S.survival.best).ico+' Bokšto laipsnis',esc(towerRank(S.survival&&S.survival.best).n)+' (banga '+fmt(S.survival&&S.survival.best||0)+')'],['🔁 Veiksmų',fmt(S.actions)]];
  return`<div class="card"><h2>📊 Statistika</h2>${rows.map(([l,v])=>`<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="mut">${l}</span><b>${v}</b></div>`).join('')}</div>`}
 const GUILD_TRACKS=[{id:'atk',ico:'⚔️',n:'Puolimo mokslas'},{id:'def',ico:'🛡️',n:'Gynybos mokslas'},{id:'trade',ico:'💰',n:'Prekybos kelias'},{id:'sci',ico:'📜',n:'Mokslo centras'}];
 function guildCard(){
@@ -1775,6 +1790,7 @@ function resultHtml(r){const c='style="text-align:center;margin:6px 0"';
  ${r.comp?`<p class="gold" ${c}>${r.comp.dup?`${r.comp.ico} Palydovas jau turimas — gauta ${r.comp.zen} 🪙 kompensacija`:`${r.comp.ico} Naujas palydovas: ${esc(r.comp.n)}!`}</p>`:''}
  ${r.compLvl?`<p class="ok" ${c}>${r.compLvl.ico} ${esc(r.compLvl.n)} pasiekė ${r.compLvl.lvl} lygį!</p>`:''}
  ${r.survival&&r.win?`<p ${c}><span class="tag">🌊 Banga ${r.wave}</span>${r.newBest?' <span class="tag gold">🏆 Naujas rekordas!</span>':''}</p>`:''}
+ ${r.survival&&r.newRank?`<p class="gold" ${c}>${r.newRank.ico} Naujas bokšto laipsnis: ${esc(r.newRank.n)}! +${r.rankRub} 🔷</p>`:''}
  ${r.survival&&!r.win?`<p class="mut" ${c}>Išgyvenai iki ${r.waveReached} bangos. Serija nutrūko.</p>`:''}
  ${r.keyDrop?`<p ${c}><span class="gold">🗝️ Rastas požemio raktas!</span></p>`:''}
  ${r.dungeon&&!r.win?`<p class="mut" ${c}>Požemis dar atidarytas — bandyk vėl, kol nesibaigė laikas.</p>`:''}
