@@ -789,10 +789,12 @@ const Server={
 function leaderboard(p){const days=(Date.now()-p.created)/864e5,rows=BOTS.map((n,i)=>({n,p:Math.round(900*Math.pow(1.36,15-i)*(1+days*.05)*(.9+((i*37)%10)/50))}));
  rows.push({n:p.name,p:power(stats(p)),me:1});rows.sort((a,b)=>b.p-a.p);return rows}
 let RANK_CACHE=null,_rankFetchAt=0;
+const MAX_SANE_PWR=200000; // apsauga nuo suklastotų (konsole/import) pwr reikšmių viršūnių lentelėje
 function refreshRankList(){if(!fbOK)return Promise.resolve();
  const now=Date.now();if(now-_rankFetchAt<15000)return Promise.resolve();_rankFetchAt=now;
- return fbDb.collection('saves').orderBy('pwr','desc').limit(15).get().then(snap=>{
-  RANK_CACHE=snap.docs.map(d=>({uk:d.id,n:(d.data()||{}).name||d.id,p:(d.data()||{}).pwr||0}));
+ return fbDb.collection('saves').orderBy('pwr','desc').limit(50).get().then(snap=>{
+  RANK_CACHE=snap.docs.map(d=>({uk:d.id,n:(d.data()||{}).name||d.id,p:(d.data()||{}).pwr||0}))
+   .filter(r=>typeof r.p==='number'&&isFinite(r.p)&&r.p>=0&&r.p<=MAX_SANE_PWR).slice(0,15);
   if(ui.tab==='arena')render()
  }).catch(e=>{console.warn('rank fetch failed',e);if(RANK_CACHE===null)RANK_CACHE=[]})}
 function realLeaderboard(p){const myUk=USER,myP=power(stats(p));
