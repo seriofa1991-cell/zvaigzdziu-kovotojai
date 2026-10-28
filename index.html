@@ -190,6 +190,7 @@ const ZONES=[
 ];
 const ZONE_IMG={pievos:'img/zone/pievos.webp',miskas:'img/zone/miskas.webp',dykuma:'img/zone/dykuma.webp',ugnikalnis:'img/zone/ugnikalnis.webp',urvai:'img/zone/urvai.webp',debesys:'img/zone/debesys.webp',arena:'img/zone/arena.webp',tustuma:'img/zone/tustuma.webp',amzina:'img/zone/amzina.webp'};
 const RACE_IMG={ugnis:'img/race/ugnis.webp',zemes:'img/race/zemes.webp',ledo:'img/race/ledo.webp',seselio:'img/race/seselio.webp',mech:'img/race/mech.webp',sviesos:'img/race/sviesos.webp'};
+const COMP_IMG={kit:'img/comp/kit.webp',owl:'img/comp/owl.webp',tur:'img/comp/tur.webp',bat:'img/comp/bat.webp',wisp:'img/comp/wisp.webp',cat:'img/comp/cat.webp'};
 const OPTS=[{k:'Lengvas',off:-2},{k:'Lygus',off:0},{k:'Sunkus',off:1},{k:'BOSAS',off:3,boss:true}];
 const ENEMY_SCALE=.95;
 const zoneForLevel=lvl=>{for(let i=ZONES.length-1;i>=0;i--)if(lvl>=ZONES[i].lvl)return i;return 0};
@@ -1196,6 +1197,7 @@ function fighterArt(rk,flip){if(RACE_IMG[rk])return imgTag(RACE_IMG[rk],flip);if
  <circle cx="50" cy="42" r="17" fill="${c[3]}"/>${hair}
  <path d="M41 41 l7 2.5 M59 41 l-7 2.5" stroke="#111" stroke-width="2.6" stroke-linecap="round"/>
  <path d="M45 52 q5 2.5 10 0" stroke="#111" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`}
+function compArt(cid){if(COMP_IMG[cid])return`<img class="ithumb" src="${esc(COMP_IMG[cid])}" alt="" loading="lazy" referrerpolicy="no-referrer">`;if(CFG.img['comp:'+cid])return`<img class="ithumb" src="${esc(CFG.img['comp:'+cid])}" alt="" loading="lazy" referrerpolicy="no-referrer">`;return null}
 function monsterArtBlob(name,z,boss,flip){
  const R=rng(hash(name)),g=gid(),col=z.mon[(R()*z.mon.length)|0],eyes=1+((R()*3)|0),horns=(R()*3)|0,w=30+R()*10+(boss?6:0),h=28+R()*10+(boss?6:0),cy=72,top=cy-h;
  let s=`<svg class="art fig${flip?' flip':''}" viewBox="0 0 100 120"><defs><radialGradient id="${g}" cx=".38" cy=".3"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".35" stop-color="${col}"/><stop offset="1" stop-color="#000" stop-opacity=".75"/></radialGradient></defs>`;
@@ -1612,15 +1614,16 @@ function tabArena(){const P=stats(S),opps=Server.arenaOpps(S),rankLoading=fbOK&&
 function compCard(){const rows=COMPANIONS.map(c=>{const owned=S.comp.owned.includes(c.id),active=S.comp.active===c.id;
  const lvl=(S.comp.lvl&&S.comp.lvl[c.id])||1,xp=(S.comp.xp&&S.comp.xp[c.id])||0,need=compXpNeed(lvl),max=lvl>=COMP_MAXLVL;
  const lvlInfo=owned?`<div class="mut" style="font-size:12px;margin-top:2px">Lyg. ${lvl}${max?' (maks.)':''} · ${(c.v*(1+.15*(lvl-1))*100).toFixed(1)}%${!max?` <span style="opacity:.7">(${xp}/${need} kovų iki kito lygio)</span>`:''}</div>${!max&&active?bar('xp','',xp/need*100):''}`:'';
- return`<button class="${active?'sel':''}" data-act="comp" data-arg="${c.id}" ${owned?'':'disabled'} style="opacity:${owned?1:.45}"><div class="row"><b>${c.ico} ${esc(c.n)}</b>${active?'<span class="tag ok">Aktyvus</span>':owned?'':'<span class="tag">Nerastas</span>'}</div><div class="mut">${c.d}</div>${lvlInfo}</button>`}).join('');
+ const thumb=compArt(c.id)||`<div class="ithumb" style="display:flex;align-items:center;justify-content:center;font-size:22px">${c.ico}</div>`;
+ return`<button class="${active?'sel':''}" data-act="comp" data-arg="${c.id}" ${owned?'':'disabled'} style="opacity:${owned?1:.45}"><div class="row2">${thumb}<div style="flex:1;min-width:0"><div class="row"><b>${owned?'':c.ico+' '}${esc(c.n)}</b>${active?'<span class="tag ok">Aktyvus</span>':owned?'':'<span class="tag">Nerastas</span>'}</div><div class="mut">${c.d}</div>${lvlInfo}</div></div></button>`}).join('');
  return`<div class="card"><h2>🐾 Palydovai (${S.comp.owned.length}/${COMPANIONS.length})</h2><p class="mut" style="margin-top:0">Reti radiniai nugalėjus bosus nuo 3-ios zonos. Tik vienas gali būti aktyvus ir kaupia lygius iš kovų.</p>${rows}</div>${expedCard()}`}
 function expedCard(){const e=S.comp.exped;
- if(e){const c=COMPANIONS.find(x=>x.id===e.id),left=Math.max(0,e.end-Date.now()),done=left<=0;
-  return`<div class="card"><h2>🧭 Ekspedicija</h2><div class="row2"><div class="ithumb" style="display:flex;align-items:center;justify-content:center;font-size:22px">${c?c.ico:'🐾'}</div><div style="flex:1;min-width:0"><b>${c?esc(c.n):''}</b><div class="mut" id="expedtag">${done?'Grįžo!':'Grįš už '+Math.ceil(left/60000)+' min.'}</div>${!done?bar('exped','',100-left/EXPED_DUR*100):''}</div></div>
+ if(e){const c=COMPANIONS.find(x=>x.id===e.id),left=Math.max(0,e.end-Date.now()),done=left<=0,ethumb=(c&&compArt(c.id))||`<div class="ithumb" style="display:flex;align-items:center;justify-content:center;font-size:22px">${c?c.ico:'🐾'}</div>`;
+  return`<div class="card"><h2>🧭 Ekspedicija</h2><div class="row2">${ethumb}<div style="flex:1;min-width:0"><b>${c?esc(c.n):''}</b><div class="mut" id="expedtag">${done?'Grįžo!':'Grįš už '+Math.ceil(left/60000)+' min.'}</div>${!done?bar('exped','',100-left/EXPED_DUR*100):''}</div></div>
   <div style="margin-top:10px"><button class="pri" data-act="claimexped" ${done?'':'disabled'}>🎁 Atsiimti</button></div></div>`}
  const free=COMPANIONS.filter(c=>S.comp.owned.includes(c.id)&&S.comp.active!==c.id);
  if(!free.length)return'';
- const rows=free.map(c=>`<button data-act="expedstart" data-arg="${c.id}"><div class="row"><b>${c.ico} ${esc(c.n)}</b><span class="tag">Siųsti</span></div></button>`).join('');
+ const rows=free.map(c=>`<button data-act="expedstart" data-arg="${c.id}"><div class="row2">${compArt(c.id)||`<div class="ithumb" style="display:flex;align-items:center;justify-content:center;font-size:22px">${c.ico}</div>`}<div style="flex:1;min-width:0"><b>${esc(c.n)}</b></div><span class="tag">Siųsti</span></div></button>`).join('');
  return`<div class="card"><h2>🧭 Ekspedicijos</h2><p class="mut" style="margin-top:0">Pasiųsk neaktyvų palydovą ${Math.round(EXPED_DUR/60000)} min. ekspedicijon — grįžęs atneš monetų ir galbūt daiktą.</p>${rows}</div>`}
 function talentCard(){const opts=TALENTS[S.race]||[];
  if(S.lvl<TALENT_LVL)return`<div class="card"><h2>🌟 Rasės talentas</h2><p class="mut" style="margin:0">Atsirakina pasiekus ${TALENT_LVL} lygį (dabar ${S.lvl}).</p></div>`;
