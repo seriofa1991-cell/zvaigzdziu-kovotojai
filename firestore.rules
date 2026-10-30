@@ -24,7 +24,15 @@ service cloud.firestore {
         && (!('pwr' in request.resource.data)
             || (request.resource.data.pwr is number
                 && request.resource.data.pwr >= 0
-                && request.resource.data.pwr <= 200000));
+                && request.resource.data.pwr <= 200000))
+        && (!('zen' in request.resource.data)
+            || (request.resource.data.zen is number
+                && request.resource.data.zen >= 0
+                && request.resource.data.zen <= 50000000))
+        && (!('rating' in request.resource.data)
+            || (request.resource.data.rating is number
+                && request.resource.data.rating >= 0
+                && request.resource.data.rating <= 20000));
     }
 
     // ---------- USERNAMES (vartotojo vardas -> Firebase UID) ----------
