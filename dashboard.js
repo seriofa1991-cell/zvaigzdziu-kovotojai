@@ -47,7 +47,13 @@
   };
 
   let rT=null;
-  window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{try{render()}catch(e){}},150)});
+  window.addEventListener('resize',()=>{
+    // Mobiliame ekrane (<900px) layoutDashboard() vis tiek nieko nedaro, bet render()
+    // visada pilnai perrašo #app innerHTML — tai sunaikindavo focus'uotą <input> kai
+    // telefono klaviatūra atsidarydavo (ji pati sukelia 'resize' įvykį), dėl ko klaviatūra
+    // akimirksniu užsidarydavo. Žemiau 900px šis listener'is dabar nieko nedaro.
+    if(window.innerWidth<900)return;
+    clearTimeout(rT);rT=setTimeout(()=>{try{render()}catch(e){}},150)});
 
   render();
 })();
