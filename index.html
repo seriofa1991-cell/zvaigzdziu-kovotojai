@@ -1885,10 +1885,12 @@ function tabAuth(){const mode=ui.authMode||'login',isLogin=mode==='login';
  <div class="card">
  <div class="chips" style="margin-bottom:12px"><button class="${isLogin?'sel':''}" data-act="authmode" data-arg="login">Prisijungti</button><button class="${!isLogin?'sel':''}" data-act="authmode" data-arg="register">Registruotis</button></div>
  <h2 style="margin-top:0">${isLogin?'Prisijungimas':'Nauja paskyra'}</h2>
- <input id="au" maxlength="16" placeholder="Vartotojo vardas" value="${esc(ui.authUser||'')}" autocomplete="username">
- <input id="ap" type="password" maxlength="40" placeholder="Slaptažodis" style="margin-top:8px" autocomplete="${isLogin?'current-password':'new-password'}">
- ${isLogin?'':`<input id="ap2" type="password" maxlength="40" placeholder="Pakartok slaptažodį" style="margin-top:8px" autocomplete="new-password">`}
- <button class="pri" style="margin-top:10px;width:100%" data-act="${isLogin?'authlogin':'authregister'}">${isLogin?'🔑 Prisijungti':'✨ Registruotis'}</button>
+ <form id="authform" autocomplete="off" onsubmit="return false">
+ <input id="au" name="zkuser" maxlength="16" placeholder="Vartotojo vardas" value="${esc(ui.authUser||'')}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+ <input id="ap" name="zkpass" type="password" maxlength="40" placeholder="Slaptažodis" style="margin-top:8px" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+ ${isLogin?'':`<input id="ap2" name="zkpass2" type="password" maxlength="40" placeholder="Pakartok slaptažodį" style="margin-top:8px" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">`}
+ <button class="pri" type="submit" style="margin-top:10px;width:100%" data-act="${isLogin?'authlogin':'authregister'}">${isLogin?'🔑 Prisijungti':'✨ Registruotis'}</button>
+ </form>
  <p class="mut" style="margin:10px 0 0">Jokio el. pašto nereikia — tik vardas ir slaptažodis (bent 6 simboliai). Paskyra ir pažanga saugoma serveryje — galėsi tęsti žaidimą iš bet kurio įrenginio.</p>
  </div>
  ${authFooter()}`}
@@ -1898,7 +1900,7 @@ function authFooter(){return`<div class="card"><h2 style="margin-top:0">🍪 Sla
  <p class="mut" style="text-align:center;margin:12px 0"><img src="img/logo/icon.svg" alt="" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px">Žvaigždžių Kovotojai — nepriklausomas projektas, kurtas vieno kūrėjo.</p>`}
 function tabCreate(){const rs=Object.keys(RACES).map(k=>{const r=RACES[k];return`<button class="${ui.race===k?'sel':''}" data-act="race" data-arg="${k}"><div class="row2"><div class="thumb">${fighterArt(k)}</div><div style="flex:1;min-width:0"><div class="row"><b>${r.ico} ${r.name}</b><span class="tag">${r.tag}</span></div><div class="mut">${r.desc}</div><div class="ok" style="font-size:13px">${r.perk}</div></div></div></button>`}).join('');
  return banner()+`<div class="zonebn" style="height:140px">${zoneArt(ZONES[6])}<div class="lbl" style="font-size:24px"><img src="img/logo/icon.svg" alt="" style="width:30px;height:30px;vertical-align:-7px;margin-right:6px">Žvaigždžių Kovotojai<small>Naršyklinis kovų RPG · 9 zonos · 6 rasės</small></div></div>
- <div class="card"><h2>Kovotojo vardas</h2><input id="nm" maxlength="16" placeholder="Įvesk vardą" value="${esc(ui.name)}" autocomplete="off"></div><h2>Pasirink rasę</h2><div class="grid" style="margin-bottom:12px">${rs}</div><button class="pri" data-act="create">Pradėti kovą</button>
+ <div class="card"><h2>Kovotojo vardas</h2><input id="nm" maxlength="16" placeholder="Įvesk vardą" value="${esc(ui.name)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div><h2>Pasirink rasę</h2><div class="grid" style="margin-bottom:12px">${rs}</div><button class="pri" data-act="create">Pradėti kovą</button>
  <div style="margin-top:16px;text-align:center"><button class="sm" data-act="tab" data-arg="admin" style="background:none;border:0;color:var(--mut)">🛠️ Admin</button></div>`}
 
 function render(){const app=$('#app');
